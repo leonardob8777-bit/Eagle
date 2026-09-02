@@ -338,4 +338,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BrokenPipeError:
+        # Piping into head or less closes stdout early. Point the remaining
+        # output at devnull so interpreter shutdown does not flush into the
+        # dead pipe and report the same failure a second time.
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(0)
