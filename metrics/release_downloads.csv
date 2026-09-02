@@ -41,3 +41,17 @@ snapshot_utc,tag,release_name,published_at,prerelease,asset_name,download_count,
 2026-09-02T16:53:29Z,v0.3.0-beta.3,Eagle 0.3.0 Beta 3,2026-08-15T05:41:06Z,true,Eagle-0.3.0-beta.3-unsigned.ipa,25,10957730
 2026-09-02T16:53:29Z,v0.3.0-beta.2,Eagle 0.3.0 Beta 2,2026-08-14T20:48:04Z,true,Eagle-0.3.0-beta.2-unsigned.ipa,27,10925606
 2026-09-02T16:53:29Z,v0.3.0-beta.1,Eagle 0.3.0 Beta 1,2026-08-14T07:22:31Z,true,Eagle.ipa,99,11762062
+2026-09-02T22:40:23Z,v1.0.3,Eagle 1.0.3,2026-09-01T17:57:06Z,false,Eagle-1.0.3-62.ipa,132,17240055
+2026-09-02T22:40:23Z,v1.0.2,Eagle 1.0.2,2026-08-28T03:59:16Z,false,Eagle-1.0.2-61.ipa,258,12845053
+2026-09-02T22:40:23Z,v1.0.1,Eagle 1.0.1,2026-08-27T16:16:53Z,false,Eagle-1.0.1-60.ipa,130,12281883
+2026-09-02T22:40:23Z,v1.0.0,Eagle 1.0.0,2026-08-27T05:38:23Z,false,Eagle.ipa,358,12227586
+2026-09-02T22:40:23Z,v0.3.0-beta.10,Eagle 0.3.0 Beta 10,2026-08-20T21:51:11Z,true,Eagle.ipa,79,12130557
+2026-09-02T22:40:23Z,v0.3.0-beta.9,Eagle 0.3.0 Beta 9,2026-08-20T02:35:13Z,true,Eagle.ipa,31,11626935
+2026-09-02T22:40:23Z,v0.3.0-beta.8,Eagle 0.3.0 Beta 8,2026-08-18T19:37:14Z,true,Eagle.ipa,16,11505193
+2026-09-02T22:40:23Z,v0.3.0-beta.7,Eagle 0.3.0 Beta 7,2026-08-17T08:55:24Z,true,Eagle.ipa,40,11330936
+2026-09-02T22:40:23Z,v0.3.0-beta.6,Eagle 0.3.0 Beta 6,2026-08-16T19:36:19Z,true,Eagle.ipa,11,11330604
+2026-09-02T22:40:23Z,v0.3.0-beta.5,Eagle 0.3.0 Beta 5,2026-08-15T23:44:56Z,true,Eagle.ipa,30,11158370
+2026-09-02T22:40:23Z,v0.3.0-beta.4,Eagle 0.3.0 Beta 4,2026-08-15T19:11:33Z,true,Eagle.ipa,14,11058912
+2026-09-02T22:40:23Z,v0.3.0-beta.3,Eagle 0.3.0 Beta 3,2026-08-15T05:41:06Z,true,Eagle-0.3.0-beta.3-unsigned.ipa,25,10957730
+2026-09-02T22:40:23Z,v0.3.0-beta.2,Eagle 0.3.0 Beta 2,2026-08-14T20:48:04Z,true,Eagle-0.3.0-beta.2-unsigned.ipa,27,10925606
+2026-09-02T22:40:23Z,v0.3.0-beta.1,Eagle 0.3.0 Beta 1,2026-08-14T07:22:31Z,true,Eagle.ipa,99,11762062
