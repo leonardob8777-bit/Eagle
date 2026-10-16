@@ -12,15 +12,17 @@
   supported Wallet cards, Home Screen elements, Dynamic Island and Dock lighting
   from one app. Private system operations require careful compatibility checks.
 
-  [![Latest release](https://img.shields.io/github/v/release/leonardob8777-bit/Eagle?sort=semver&style=for-the-badge&label=LATEST%20RELEASE&color=7C3AED)](https://github.com/leonardob8777-bit/Eagle/releases)
-  [![Total IPA downloads](https://img.shields.io/github/downloads/leonardob8777-bit/Eagle/total?style=for-the-badge&logo=icloud&logoColor=white&label=IPA%20DOWNLOADS&color=0891B2)](https://github.com/leonardob8777-bit/Eagle/releases)
-  [![GitHub stars](https://img.shields.io/github/stars/leonardob8777-bit/Eagle?style=for-the-badge&logo=github&label=STARS&color=F59E0B)](https://github.com/leonardob8777-bit/Eagle/stargazers)
-  [![AGPL-3.0](https://img.shields.io/github/license/leonardob8777-bit/Eagle?style=for-the-badge&label=LICENSE&color=16A34A)](LICENSE)
+  [![Latest release](docs/badges/release.svg)](https://github.com/leonardob8777-bit/Eagle/releases/latest)
+  [![Total IPA downloads](docs/badges/downloads.svg)](https://github.com/leonardob8777-bit/Eagle/releases)
+  [![GitHub stars](docs/badges/stars.svg)](https://github.com/leonardob8777-bit/Eagle/stargazers)
+  [![AGPL-3.0](docs/badges/license.svg)](LICENSE)
+
+  <sub>Counts checked October 16, 2026, 21:15 UTC. Open Releases or Stars for current totals. Downloads count IPA files only.</sub>
 
   <br>
 
   <a href="https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.6/Eagle-1.0.6-95.ipa">
-    <img src="https://img.shields.io/badge/DOWNLOAD_EAGLE.IPA-VERSION_1.0.6-171717?style=for-the-badge&logo=apple&logoColor=white" alt="Download Eagle 1.0.6 IPA" height="48">
+    <img src="docs/badges/download.svg" alt="Download Eagle 1.0.6 IPA" height="40">
   </a>
 
   <br><br>

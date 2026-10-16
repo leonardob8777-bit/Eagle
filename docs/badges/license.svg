@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="178" height="28" role="img" aria-label="LICENSE: AGPL-3.0">
+  <title>LICENSE: AGPL-3.0</title>
+  <rect width="82" height="28" fill="#444"/>
+  <rect x="82" width="96" height="28" fill="#16a34a"/>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="10" letter-spacing="1">
+    <text x="41" y="18">LICENSE</text>
+    <text x="130" y="18" font-weight="bold">AGPL-3.0</text>
+  </g>
+</svg>
