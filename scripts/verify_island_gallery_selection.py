@@ -11,7 +11,8 @@ assert "presentationPicker" not in source
 assert "collectionIntro" not in source
 assert "Small Island" not in source
 assert "A preview of the look" not in source
-assert 'case .still: return "Static"' in source
+filter_model = (repo / "lara/EagleCore/IslandGallery/EagleIslandGalleryFilter.swift").read_text()
+assert 'case .still: return "Static"' in filter_model
 
 
 def declaration(marker):
@@ -25,13 +26,16 @@ def declaration(marker):
 
 
 style = (repo / "lara/views/new/IslandGalleryView.swift").read_text().split("private final class IslandGalleryRemoteCallBox:")[0]
-model = (repo / "lara/views/new/IslandLiveMedia.swift").read_text().split("/// An isolated,")[0]
-types = source.split("struct IslandGalleryView: View")[0]
+model = (repo / "lara/EagleCore/IslandGallery/EagleIslandGalleryCatalog.swift").read_text() + "\n" + (repo / "lara/views/new/IslandLiveMedia.swift").read_text().split("/// An isolated,")[0]
+types = (repo / "lara/EagleCore/IslandGallery/EagleIslandGalleryFavorites.swift").read_text() + "\n" + filter_model + "\n" + source.split("struct IslandGalleryView: View")[0]
+types = (repo / "lara/EagleCore/IslandGallery/EagleIslandGallerySelection.swift").read_text() + "\n" + types
+types = "\n".join((repo / f"lara/EagleCore/IslandGallery/EagleIslandGallery{name}.swift").read_text()
+                  for name in ("Collection", "Recovery")) + "\n" + types
 helpers = "\n".join(declaration(marker) for marker in [
     "private var artworks:", "private var favorites:", "private var visibleArtworks:",
     "private var selected:", "private var activeArtwork:",
     "private var hasRetiredIslandStyle:", "private func isActive(",
-    "private var selectionIndex:", "private func toggleFavorite(", "private func select(",
+    "private var selectionIndex:", "private var selectionController:", "private func toggleFavorite(", "private func select(",
     "private func selectFilter(", "private func synchronizeSelection(",
     "private func restoreSelection(", "private func step(",
 ])
@@ -42,7 +46,7 @@ enum IslandLiveMedia {
     static let posterURL = URL(string: "https://example.test/singularity-live.png")!
 }
 struct UISelectionFeedbackGenerator { func selectionChanged() {} }
-final class Harness {
+@MainActor final class Harness {
     var selectedRaw = IslandGalleryStyle.starlight.rawValue
     var selectedID = ""
     var favoritesJSON = "[]"
@@ -150,9 +154,14 @@ tests = r'''
         print("PASS: \(allCount) unique styles; \(liveCount) Live; \(stillCount) static; carousel wraparound; category memory; saved/removable favorites; empty/search states; unique active identity; operation lock; cold-start restoration; offline fallback")
     }
 }
-try Harness.verify()
+@main struct SelectionChecks {
+    @MainActor static func main() throws { try Harness.verify() }
+}
 '''
 with tempfile.TemporaryDirectory(prefix="eagle-island-selection-") as temporary:
     path = Path(temporary) / "Selection.swift"
     path.write_text((style + model + types + stub + helpers + tests).replace("import UIKit\n", ""))
-    subprocess.run(["swift", str(path), str(repo.parent / "Eagle-Gallery/catalogs/island-gallery-v1.json")], check=True)
+    binary = Path(temporary) / "verify"
+    subprocess.run(["xcrun", "--sdk", "macosx", "swiftc", "-swift-version", "5", "-parse-as-library",
+                    str(path), "-o", str(binary)], check=True)
+    subprocess.run([str(binary), str(repo.parent / "Eagle-Gallery/catalogs/island-gallery-v1.json")], check=True)

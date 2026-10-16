@@ -7,7 +7,7 @@ import tempfile
 root = Path(__file__).resolve().parents[1]
 home = (root / "lara/views/new/LaraHomeView.swift").read_text()
 policy = (root / "lara/config/EagleFeaturePolicy.swift").read_text()
-language = (root / "lara/config/LaraLanguage.swift").read_text()
+language = (root / "lara/EagleCore/Localization/EagleLocalization.swift").read_text() + "\n" + (root / "lara/config/LaraLanguage.swift").read_text()
 
 def block(source, marker):
     start = source.index(marker)
@@ -20,7 +20,8 @@ def block(source, marker):
 
 # Presentation wiring checks complement the executable search tests below.
 assert "if EagleFeaturePolicy.allows(.advancedSystemTools, channel: currentChannel) {\n                        laboratoryTools" in home
-assert "showingSettings = true" in block(home, "private var laboratoryTools:")
+assert "showingLaboratory = true" in block(home, "private var laboratoryTools:")
+assert '.sheet(isPresented: $showingLaboratory) {\n                LaboratoryToolsView()\n                    .environmentObject(mgr)' in home
 assert "if route == .advancedSettings {\n            Button { showingSettings = true }" in home
 assert "SettingsView().environmentObject(mgr)" in block(home, "private func toolDestination(")
 

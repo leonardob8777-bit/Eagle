@@ -9,20 +9,28 @@ private enum EagleAppSection {
 struct EagleAppShellView: View {
     @ObservedObject private var sceneManager = EagleSceneManager.shared
     @State private var selectedSection = EagleAppSection.customize
+    /// Observed so the tab titles and contents change language at once, like the rest of the app.
+    @AppStorage(LaraLanguage.storageKey) private var language = LaraLanguage.english
 
     private let shellBackground = Color(uiColor: .systemGroupedBackground)
 
     var body: some View {
         TabView(selection: $selectedSection) {
             EagleBeta10AccessView()
+                // Rebuilt in the new language at once (cards that hold no language state otherwise
+                // keep their old text until reopened). The tab itself stays where it is.
+                .id(language)
                 .environment(\.laraMediaPreviewsEnabled, selectedSection == .access)
+                .environment(\.eagleTabIsCurrent, selectedSection == .access)
                 .tabItem {
                     Label(LaraL10n.text(en: "Access", es: "Acceso"), systemImage: "lock.shield.fill")
                 }
                 .tag(EagleAppSection.access)
 
             LaraHomeView()
+                .id(language)
                 .environment(\.laraMediaPreviewsEnabled, selectedSection == .customize)
+                .environment(\.eagleTabIsCurrent, selectedSection == .customize)
                 .tabItem {
                     Label(LaraL10n.text(en: "Customize", es: "Personalizar"), systemImage: "sparkles")
                 }
@@ -32,6 +40,13 @@ struct EagleAppShellView: View {
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .background(shellBackground.ignoresSafeArea())
+        // A light tick when switching tabs, like a system picker.
+        .onChange(of: selectedSection) { _ in UISelectionFeedbackGenerator().selectionChanged() }
+        .onAppear {
+            // The screens land as soon as Eagle opens. With the welcome on top this happens out of sight,
+            // so when it opens they are already in place and nothing lands afterwards.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { EagleArrival.shared.arrive() }
+        }
         .eagleNotice(item: $sceneManager.notice, title: "Eagle Scenes") { $0.message }
         .overlay {
             if sceneManager.isApplying {
@@ -48,7 +63,13 @@ struct EagleAppShellView: View {
 
 }
 
-private struct TelegramSafariView: UIViewControllerRepresentable {
+/// Eagle's official Telegram channel.
+enum EagleLinks {
+    static let telegram = URL(string: "https://t.me/LBsignapp")!
+}
+
+/// Opens a link (Telegram) in Safari inside Eagle, tinted Telegram blue.
+struct TelegramSafariView: UIViewControllerRepresentable {
     let url: URL
 
     func makeUIViewController(context: Context) -> SFSafariViewController {
@@ -73,6 +94,7 @@ private struct EagleBeta10AccessView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     accessHeader
+                        .eagleArrival(0)
 
                     if sceneManager.hasPendingShortcut {
                         VStack(alignment: .leading, spacing: 10) {
@@ -87,23 +109,30 @@ private struct EagleBeta10AccessView: View {
                                 sceneManager.applyPendingShortcutIfNeeded()
                             }
                         }
+                        .eagleArrival(1)
                     } else {
                         LaraAccessView(compact: false) {
                             sceneManager.applyPendingShortcutIfNeeded()
                         }
+                        .eagleArrival(1)
+                        .eagleScrollDepth()
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text(LaraL10n.text(en: "Prepare report", es: "Reporte de Preparar"))
                             .font(.headline)
+                            .eagleBackdropText()
                             .padding(.horizontal, 2)
                             .accessibilityAddTraits(.isHeader)
                         EaglePrepareCrashReportCard()
                     }
+                    .eagleArrival(2)
+                    .eagleScrollDepth()
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text(LaraL10n.text(en: "Access tools", es: "Herramientas de acceso"))
                             .font(.headline)
+                            .eagleBackdropText()
                             .padding(.horizontal, 2)
                             .accessibilityAddTraits(.isHeader)
 
@@ -134,26 +163,34 @@ private struct EagleBeta10AccessView: View {
                                 )
                             }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(EaglePressableStyle(kind: .row))
                         .background(Color(uiColor: .secondarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 22, style: .continuous)
                                 .strokeBorder(EagleVisualTheme.surfaceBorder(for: colorScheme), lineWidth: 1)
                         }
-                        .shadow(color: EagleVisualTheme.surfaceShadow(for: colorScheme), radius: 10, y: 4)
+                        .eagleSurfaceShadow(cornerRadius: 22)
                     }
+                    .eagleArrival(3)
+                    .eagleScrollDepth()
 
                     telegramCard
+                        .eagleArrival(4)
+                        .eagleScrollDepth()
 
                     trustNote
+                        .eagleArrival(5)
+                        .eagleScrollDepth()
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
                 .padding(.bottom, 36)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(EagleBackdrop().ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .eagleRootNavigationBar()
+            .eagleStatusBarVeil()
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
                     .environmentObject(mgr)
@@ -163,7 +200,7 @@ private struct EagleBeta10AccessView: View {
     }
 
     private var accessHeader: some View {
-        EagleHeaderBar(language: $language) {
+        EagleHeaderBar(language: $language, showsBackdropToggle: true) {
             showingSettings = true
         }
     }
@@ -225,6 +262,7 @@ private struct EagleBeta10AccessView: View {
             Image(systemName: systemImage)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
+                .eagleArrivalBounce(delay: 0.5)
                 .frame(width: 38, height: 38)
                 .background(
                     Color.primary.opacity(0.07),
@@ -272,7 +310,7 @@ private struct EagleBeta10AccessView: View {
                 }
                 .frame(width: 54, height: 54)
 
-                Text("Text me")
+                Text(LaraL10n.text(en: "Text me", es: "Escríbeme"))
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.primary)
                     .eagleRainbowSweep()
@@ -286,20 +324,20 @@ private struct EagleBeta10AccessView: View {
             .padding(14)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle(kind: .row))
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(EagleVisualTheme.surfaceBorder(for: colorScheme), lineWidth: 1)
         }
-        .shadow(color: EagleVisualTheme.surfaceShadow(for: colorScheme), radius: 10, y: 4)
+        .eagleSurfaceShadow(cornerRadius: 22)
         .sheet(isPresented: $showingTelegram) {
-            TelegramSafariView(url: URL(string: "https://t.me/LEONARDOPHL")!)
+            TelegramSafariView(url: EagleLinks.telegram)
                 .ignoresSafeArea()
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Text me")
+        .accessibilityLabel(LaraL10n.text(en: "Text me", es: "Escríbeme"))
         .accessibilityAddTraits(.isButton)
     }
 

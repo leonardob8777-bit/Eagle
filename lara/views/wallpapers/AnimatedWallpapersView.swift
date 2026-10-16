@@ -70,7 +70,7 @@ struct AnimatedWallpapersView: View {
                 creatorView
             }
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle(LaraL10n.text(en: "Wallpapers", es: "Fondos"))
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: mode) { selectedMode in
@@ -107,10 +107,6 @@ struct AnimatedWallpapersView: View {
                 intro
                 preview
 
-                if !mgr.sbxready {
-                    LaraAccessView(compact: true)
-                }
-
                 if movieURL != nil {
                     options
                 }
@@ -121,6 +117,13 @@ struct AnimatedWallpapersView: View {
             .padding(.horizontal, 20)
             .padding(.top, 12)
             .padding(.bottom, 40)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if movieURL != nil || !mgr.sbxready {
+                EagleApplyBar(ready: mgr.sbxready) {
+                    installArea
+                }
+            }
         }
     }
 
@@ -139,6 +142,7 @@ struct AnimatedWallpapersView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .eagleHeaderCard()
     }
 
     private var preview: some View {
@@ -199,7 +203,7 @@ struct AnimatedWallpapersView: View {
     // Slow, soft aurora that orbits behind the empty preview so the mock feels
     // alive. Hidden once a real video is loaded; frozen with Reduce Motion.
     private var previewAurora: some View {
-        TimelineView(.animation(paused: reduceMotion)) { context in
+        EagleAmbientTimeline(paused: reduceMotion) { context in
             let seconds = context.date.timeIntervalSinceReferenceDate
             let spin = reduceMotion
                 ? 0
@@ -257,30 +261,15 @@ struct AnimatedWallpapersView: View {
                     systemImage: "photo.on.rectangle")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
+            .buttonStyle(EagleSecondaryButtonStyle())
             .disabled(installer.isWorking || loadingSelection)
+        }
+    }
 
-            if let movieURL {
-                Button {
-                    installer.install(video: movieURL, autoReverses: autoReverses)
-                } label: {
-                    HStack {
-                        if installer.isWorking {
-                            ProgressView()
-                                .tint(.white)
-                        }
-                        Text(installer.isWorking
-                            ? LaraL10n.text(en: "Preparing wallpaper…", es: "Preparando fondo…")
-                            : LaraL10n.text(en: "Add to Wallpapers", es: "Agregar a Fondos"))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!mgr.sbxready || installer.isWorking)
-            }
-
+    /// "Add to Wallpapers" and its progress, in the screen's fixed bottom bar.
+    @ViewBuilder
+    private var installArea: some View {
+        VStack(spacing: 12) {
             if installer.isWorking {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -298,9 +287,29 @@ struct AnimatedWallpapersView: View {
                     }
                     .font(.footnote.weight(.medium))
                 }
-                .padding(.top, 4)
+                .transition(.opacity)
+            }
+
+            if let movieURL {
+                Button {
+                    installer.install(video: movieURL, autoReverses: autoReverses)
+                } label: {
+                    HStack {
+                        if installer.isWorking {
+                            ProgressView()
+                                .tint(EagleVisualTheme.actionText)
+                        }
+                        Text(installer.isWorking
+                            ? LaraL10n.text(en: "Preparing wallpaper…", es: "Preparando fondo…")
+                            : LaraL10n.text(en: "Add to Wallpapers", es: "Agregar a Fondos"))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(EagleApplyButtonStyle(busy: installer.isWorking))
+                .disabled(!mgr.sbxready || installer.isWorking)
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: installer.isWorking)
     }
 
     private var attribution: some View {

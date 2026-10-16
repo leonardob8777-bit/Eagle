@@ -155,7 +155,7 @@ struct CardView: View {
 
         @ViewBuilder private var sheen: some View {
             if image != nil {
-                TimelineView(.animation(paused: reduceMotion)) { timeline in
+                EagleAmbientTimeline(paused: reduceMotion) { timeline in
                     let t = timeline.date.timeIntervalSinceReferenceDate
                     let sweep = 6.5
                     let breath = 5.0
@@ -242,7 +242,7 @@ struct CardView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 4)
+                .eagleHeaderCard()
 
                 if !mgr.sbxready {
                     LaraAccessView(compact: true)
@@ -321,7 +321,7 @@ struct CardView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Tarjetas")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

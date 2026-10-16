@@ -23,11 +23,16 @@ struct DockCustomizerView: View {
                 dockPreview
                 capacityCard
                 explanationCard
-                applyButton
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        // Apply stays fixed at the bottom, in reach of the thumb; Prepare takes its place until ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            EagleApplyBar(ready: true) {
+                applyButton
+            }
+        }
+        .eagleScreenBackdrop()
         .navigationTitle("Dock")
         .navigationBarTitleDisplayMode(.inline)
         .eagleNotice(item: $alert, title: "Dock") { $0.message }
@@ -47,6 +52,7 @@ struct DockCustomizerView: View {
                     .background(.regularMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
+                .transition(.eagleWorking)
             }
         }
     }
@@ -83,7 +89,7 @@ struct DockCustomizerView: View {
     private var dockStrip: some View {
         let previewCapacity = EagleStoredThemeValues.dockPreviewCapacity(selectedCapacity)
         let compact = previewCapacity == 6
-        return TimelineView(.animation(paused: reduceMotion)) { context in
+        return EagleAmbientTimeline(paused: reduceMotion) { context in
             ZStack {
                 AngularGradient(
                     colors: washColors,
@@ -248,7 +254,7 @@ struct DockCustomizerView: View {
             .shadow(color: Color.primary.opacity(0.12), radius: 10, y: 4)
             .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         }
-        .buttonStyle(DockPressButtonStyle())
+        .buttonStyle(EagleApplyButtonStyle(fill: nil, busy: isApplying))
         .disabled(isApplying)
     }
 

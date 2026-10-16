@@ -10,5 +10,12 @@
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>EagleLaunchBackground</string>
+	</dict>
+	<key>UIStatusBarHidden</key>
+	<true/>
 </dict>
 </plist>

@@ -267,6 +267,7 @@ struct HomeIconNeonView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .accessibilityElement(children: .combine)
                 }
+                .transition(.eagleWorking)
             }
         }
         .onAppear(perform: reconcileState)
@@ -283,18 +284,18 @@ struct HomeIconNeonView: View {
                 paletteCard
                 intensityCard
                 scopeCard
-
-                if !mgr.dsready {
-                    LaraAccessView(compact: true)
-                }
-
-                applyButton
-                removeButton
                 diagnosticsCard
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        // Apply stays fixed at the bottom, in reach of the thumb; Prepare takes its place until ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            EagleApplyBar(ready: mgr.dsready) {
+                applyButton
+                removeButton
+            }
+        }
+        .eagleScreenBackdrop()
         .navigationTitle(LaraL10n.text(en: "Home Icon Neon", es: "Neón de iconos"))
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isApplying)
@@ -424,11 +425,12 @@ struct HomeIconNeonView: View {
                                 Image(systemName: "checkmark")
                                     .font(.caption.bold())
                                     .foregroundStyle(.white)
+                                    .transition(.eagleCheck)
                             }
                         }
                         .frame(width: 42, height: 42)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(EaglePressableStyle(kind: .swatch))
                 }
                 Spacer(minLength: 0)
             }
@@ -593,14 +595,16 @@ struct HomeIconNeonView: View {
                                 Circle()
                                     .strokeBorder(.primary, lineWidth: 2.5)
                                     .frame(width: 42, height: 42)
+                                    .transition(.eagleCheck)
                                 Image(systemName: "checkmark")
                                     .font(.caption2.bold())
                                     .foregroundStyle(.white)
+                                    .transition(.eagleCheck)
                             }
                         }
                         .frame(width: 48, height: 48)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(EaglePressableStyle(kind: .swatch))
                     .disabled(isApplying)
                     .accessibilityLabel(palette.title)
                     .accessibilityAddTraits(selectedPalette == palette ? .isSelected : [])
@@ -708,15 +712,10 @@ struct HomeIconNeonView: View {
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: 52)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(EagleVisualTheme.actionFill)
-        .foregroundStyle(EagleVisualTheme.actionText)
+        .buttonStyle(EagleApplyButtonStyle(busy: isApplying))
         .disabled(
             isApplying || !mgr.dsready || mgr.rcSafetyLocked ||
             !supportedDevice || !policyAllowsApply
-        )
-        .opacity(
-            mgr.dsready && supportedDevice && policyAllowsApply ? 1 : 0.55
         )
     }
 

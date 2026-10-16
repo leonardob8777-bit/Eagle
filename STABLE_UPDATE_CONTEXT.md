@@ -1,5 +1,9 @@
 # Eagle Stable Update Context
 
+Historical stability context, predating 1.0.6. For current user-facing copy,
+see [1.0.6 update notes](docs/stable-update-notes.md) and the
+[published release notes](docs/releases/v1.0.6.md).
+
 Use this as source context for the future Updates window. Do not treat this file
 as UI code; it is only a note of the stability work that should replace the old
 welcome/beta wording when the visual pass is ready.

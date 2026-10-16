@@ -76,7 +76,13 @@ private struct RemoteCallDaemonRequest {
 #endif
 
 final class laramgr: ObservableObject {
-    @Published var log: String = ""
+    private let diagnostics: EagleDiagnosticDelivery
+    private var logHistory: EagleLogHistory { diagnostics.history }
+    private var logHistoryObservation: AnyCancellable?
+    var log: String {
+        get { logHistory.text }
+        set { logHistory.text = newValue }
+    }
     // DarkSword can emit bursts of native log and progress callbacks while its
     // race is active. Sending every callback to the main queue individually
     // can starve SwiftUI even though the exploit itself runs in the background.
@@ -252,11 +258,16 @@ final class laramgr: ObservableObject {
     lazy var ytProc = RemoteCall(process: "youtube", useMigFilterBypass: false)
     private var prepareAttemptID: String?
     
-    static let shared = laramgr()
+    static let shared = laramgr(diagnostics: EagleAppDiagnostics.shared)
     static let fontpath = "/System/Library/Fonts/Core/SFUI.ttf"
     static let italicfontpath = "/System/Library/Fonts/Core/SFUIItalic.ttf"
     static let monofontpath = "/System/Library/Fonts/Core/SFUIMono.ttf"
-    init() {}
+    init(diagnostics: EagleDiagnosticDelivery? = nil) {
+        self.diagnostics = diagnostics ?? EagleAppDiagnostics.makeDelivery()
+        logHistoryObservation = logHistory.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+    }
 
     private func enqueueDSLog(_ message: String) {
         scheduleDSUIFlush(logLine: message, progress: nil)
@@ -300,8 +311,7 @@ final class laramgr: ObservableObject {
 
         if !lines.isEmpty {
             let batch = lines.joined(separator: "\n")
-            log += batch + "\n"
-            if log.utf8.count > 256 * 1024 { log = String(log.suffix(128 * 1024)) }
+            logHistory.append(batch)
             globallogger.log(batch)
         }
         if let progress {
@@ -526,11 +536,7 @@ final class laramgr: ObservableObject {
     }
     
     func logmsg(_ message: String) {
-        DispatchQueue.main.async {
-            self.log += message + "\n"
-            if self.log.utf8.count > 256 * 1024 { self.log = String(self.log.suffix(128 * 1024)) }
-            globallogger.log(message)
-        }
+        diagnostics.enqueue(message, retaining: self)
     }
     
     func kread64(address: UInt64) -> UInt64 {

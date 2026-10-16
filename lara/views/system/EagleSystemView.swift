@@ -1512,7 +1512,7 @@ struct EagleSystemView: View {
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Eagle System")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -1571,7 +1571,7 @@ struct EagleSystemView: View {
     // A soft light that drifts slowly across the hero so the header feels alive;
     // it holds still when Reduce Motion is on.
     private var heroSheen: some View {
-        TimelineView(.animation(paused: reduceMotion)) { context in
+        EagleAmbientTimeline(paused: reduceMotion) { context in
             let seconds = context.date.timeIntervalSinceReferenceDate
             let a = reduceMotion
                 ? 0.6
@@ -1648,7 +1648,7 @@ struct EagleGuardianView: View {
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Guardian")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { guardian.refresh() }
@@ -1777,6 +1777,8 @@ struct EagleGuardianView: View {
                     restoreCandidate = checkpoint
                 }
                 .buttonStyle(.borderedProminent)
+                // The contrasting colour on the black/white fill, grey while disabled.
+                .eagleProminentLabel()
                 Button(LaraL10n.text(en: "Discard", es: "Descartar"), role: .destructive) {
                     guardian.discardPendingRecovery()
                 }
@@ -1947,7 +1949,7 @@ struct EagleScenesView: View {
                         .background(Color(uiColor: .secondarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(EaglePressableStyle(kind: .card))
                 } else {
                     ForEach(manager.customScenes) { scene in
                         sceneCard(scene)
@@ -1961,7 +1963,7 @@ struct EagleScenesView: View {
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Scenes")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -2124,7 +2126,7 @@ struct EagleScenesView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(EagleVisualTheme.actionFill)
-                .foregroundStyle(EagleVisualTheme.actionText)
+                .eagleProminentLabel()
 
                 Menu {
                     Button {
@@ -2199,8 +2201,7 @@ struct EagleScenesView: View {
                 Button(LaraL10n.text(en: "Apply", es: "Aplicar")) {
                     manager.apply(scene)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(EagleApplyButtonStyle(busy: manager.isApplying, compact: true))
             }
             .disabled(manager.isApplying)
         }
@@ -2504,6 +2505,8 @@ struct EagleCapsulesView: View {
                         .frame(height: 50)
                 }
                 .buttonStyle(.borderedProminent)
+                // The contrasting colour on the black/white fill, grey while disabled.
+                .eagleProminentLabel()
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(LaraL10n.text(en: "Share a Scene", es: "Compartir una Scene"))
@@ -2545,7 +2548,7 @@ struct EagleCapsulesView: View {
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Capsules")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(
@@ -2656,27 +2659,55 @@ struct EagleCapsulesView: View {
     }
 }
 
+/// Full-screen "working" card while Eagle applies something. Visual only: it shows the same title and
+/// progress it is given. Eagle's rainbow activity mark, a monochrome bar (like Prepare's) that glides
+/// to each new value, the percentage rolling, and a soft entrance and exit wherever it is shown.
 struct EagleBlockingProgress: View {
     let title: String
     let progress: Double
 
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var clamped: Double { max(0, min(progress, 1)) }
+    private var percent: Int { Int(clamped * 100) }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.18).ignoresSafeArea()
-            VStack(spacing: 13) {
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .frame(width: 190)
+            VStack(spacing: 14) {
+                EagleRainbowSpinner(size: 26)
                 Text(title)
                     .font(.headline)
                     .multilineTextAlignment(.center)
-                Text("\(Int(max(0, min(progress, 1)) * 100))%")
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.primary.opacity(0.12))
+                        Capsule()
+                            .fill(Color.primary)
+                            .frame(width: max(6, geometry.size.width * clamped))
+                    }
+                }
+                .frame(width: 200, height: 6)
+                .animation(.spring(response: 0.55, dampingFraction: 0.9), value: clamped)
+                Text("\(percent)%")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.25), value: percent)
             }
-            .padding(23)
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, 26)
+            .padding(.vertical, 22)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.14), radius: 24, y: 10)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue("\(percent)%")
         }
+        // Carries its own animation, so it eases in and out even where it is shown without one.
+        .transition(.eagleWorking)
     }
 }

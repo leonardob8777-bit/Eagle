@@ -1171,16 +1171,6 @@ struct LaraMatchView: View {
                     .background(Color(uiColor: .secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-                    if !mgr.sbxready {
-                        LaraAccessView(compact: true) {
-                            manager.refreshCompatibility()
-                        }
-                    }
-
-                    if manager.isWorking {
-                        progressCard
-                    }
-
                     actions(analysis, composition: composition)
                 } else if analysis != nil {
                     composingCard
@@ -1199,12 +1189,34 @@ struct LaraMatchView: View {
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .eagleBackdropText()
             }
             .padding(.horizontal, 18)
             .padding(.top, 12)
             .padding(.bottom, 40)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        // With a composition ready, Apply (and its progress) stays fixed at the bottom; Prepare takes
+        // its place until Eagle is ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let analysis, let composition {
+                EagleApplyBar(ready: mgr.sbxready, onPrepared: { manager.refreshCompatibility() }) {
+                    if manager.isWorking {
+                        progressCard
+                    }
+                    Button { apply(analysis, composition: composition) } label: {
+                        Label(LaraL10n.text(en: "Apply composition", es: "Aplicar composición"), systemImage: "wand.and.sparkles")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(EagleApplyButtonStyle(busy: manager.isWorking))
+                    .disabled(
+                        manager.isWorking ||
+                        !mgr.sbxready ||
+                        !(includeWallpaper || includePasscode || includeCard)
+                    )
+                }
+            }
+        }
+        .eagleScreenBackdrop()
         .navigationTitle("Eagle Composer")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -1265,6 +1277,7 @@ struct LaraMatchView: View {
             ))
                 .foregroundStyle(.secondary)
         }
+        .eagleHeaderCard()
     }
 
     private var pickerHero: some View {
@@ -1306,7 +1319,7 @@ struct LaraMatchView: View {
                     .foregroundStyle(Color.indigo.opacity(0.25))
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle())
         .disabled(isProcessing)
     }
 
@@ -1523,22 +1536,7 @@ struct LaraMatchView: View {
                 Label(LaraL10n.text(en: "Full preview", es: "Vista previa completa"), systemImage: "eye.fill")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-
-            Button { apply(analysis, composition: composition) } label: {
-                Label(LaraL10n.text(en: "Apply composition", es: "Aplicar composición"), systemImage: "wand.and.sparkles")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(EagleVisualTheme.actionFill)
-            .foregroundStyle(EagleVisualTheme.actionText)
-            .controlSize(.large)
-            .disabled(
-                manager.isWorking ||
-                !mgr.sbxready ||
-                !(includeWallpaper || includePasscode || includeCard)
-            )
+            .buttonStyle(EagleSecondaryButtonStyle())
 
             Button {
                 do {
@@ -1554,7 +1552,7 @@ struct LaraMatchView: View {
                 Label(LaraL10n.text(en: "Save to My Compositions", es: "Guardar en Mis composiciones"), systemImage: "bookmark")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(EaglePressableStyle(kind: .card))
             .font(.subheadline.weight(.semibold))
             .padding(.top, 4)
         }
@@ -1579,7 +1577,7 @@ struct LaraMatchView: View {
                             } label: {
                                 savedMatchCard(match)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(EaglePressableStyle())
                             .contextMenu {
                                 Button(role: .destructive) {
                                     store.delete(match)
@@ -1679,6 +1677,8 @@ struct LaraMatchView: View {
             }
         }
         .padding(.vertical, 9)
+        // The disclosure clips its content at the edge, and the switch draws a little wider than its frame.
+        .padding(.trailing, 4)
     }
 
     private func matchSummaryRow(
@@ -1895,6 +1895,12 @@ private struct EagleComposerPreviewView: View {
                         previewChip(.card, enabled: includeCard)
                     }
 
+                }
+                .padding(20)
+                .padding(.bottom, 24)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                EagleApplyBar {
                     Button {
                         dismiss()
                         apply()
@@ -1902,15 +1908,10 @@ private struct EagleComposerPreviewView: View {
                         Label(LaraL10n.text(en: "Apply this composition", es: "Aplicar esta composición"), systemImage: "wand.and.sparkles")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(EagleVisualTheme.actionFill)
-                    .foregroundStyle(EagleVisualTheme.actionText)
-                    .controlSize(.large)
+                    .buttonStyle(EagleApplyButtonStyle())
                 }
-                .padding(20)
-                .padding(.bottom, 24)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .eagleScreenBackdrop()
             .navigationTitle("Eagle Composer · \(intensity.title)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -2099,7 +2100,7 @@ struct CompleteStyleComparisonView: View {
                 .padding(20)
                 .padding(.bottom, 24)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .eagleScreenBackdrop()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

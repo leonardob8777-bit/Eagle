@@ -51,6 +51,22 @@ if [ ! -d "$BUILT_APP" ]; then
   exit 1
 fi
 
+# An incremental Release build can extract the current intents while skipping
+# their SSU training phase. Generate from this build's metadata, never from an
+# older IPA, so Scenes/Moments retain their English and Spanish shortcuts.
+if [ -f "$BUILT_APP/Metadata.appintents/extract.actionsdata" ]; then
+  INTENTS_TEMP="$STAGING_DIR/app-intents"
+  mkdir -p "$INTENTS_TEMP"
+  APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BUILT_APP/Info.plist")
+  xcrun appintentsnltrainingprocessor \
+    --extracted-metadata-path "$BUILT_APP/Metadata.appintents" \
+    --infoplist-path "$BUILT_APP/Info.plist" \
+    --bundle-id "$APP_BUNDLE_ID" \
+    --product-path "$BUILT_APP" \
+    --temp-dir-path "$INTENTS_TEMP" \
+    --archive-ssu-assets
+fi
+
 PAYLOAD_DIR="$STAGING_DIR/Payload"
 PACKAGED_APP="$PAYLOAD_DIR/$PRODUCT_NAME.app"
 mkdir -p "$PAYLOAD_DIR"

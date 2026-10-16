@@ -147,6 +147,8 @@ struct EagleSupportSnapshotCard: View {
                         .fixedSize(horizontal: true, vertical: false)
                     }
                     .buttonStyle(.borderedProminent)
+                    // The contrasting colour on the black/white fill, grey while disabled.
+                    .eagleProminentLabel()
 
                     copyButton
                 }
@@ -160,6 +162,8 @@ struct EagleSupportSnapshotCard: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    // The contrasting colour on the black/white fill, grey while disabled.
+                    .eagleProminentLabel()
 
                     Button(action: copySnapshot) {
                         copyLabel

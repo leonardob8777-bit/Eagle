@@ -40,13 +40,15 @@ struct EagleGalleryPreviewSheen: View {
 
     var body: some View {
         let paused = !active || reduceMotion || scenePhase != .active
-        TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: paused)) { context in
-            GeometryReader { proxy in
+        // Measured once, outside the clock; 60 fps: the highlight crosses the preview at about 120 pt a
+        // second, which steps visibly at 20.
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: paused)) { context in
                 let progress = paused
                     ? -0.25
                     : context.date.timeIntervalSinceReferenceDate
                         .truncatingRemainder(dividingBy: 5.5) / 5.5
-                let width = max(proxy.size.width, 1)
 
                 LinearGradient(
                     colors: [.clear, .white.opacity(opacity), .clear],

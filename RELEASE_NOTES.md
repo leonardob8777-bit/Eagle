@@ -1,3 +1,15 @@
+# Eagle 1.0.6 (95)
+
+Simplified Chinese, a new Eagle icon and opening, fixed Prepare/Apply bars,
+31 new online Dock backgrounds, clearer light/dark controls and smoother feedback.
+
+See [the complete 1.0.6 release notes](docs/releases/v1.0.6.md) for the download,
+changes, verification, compatibility and known visual limitations.
+
+Previous release: [Eagle 1.0.5](docs/RELEASE_1.0.5.md).
+
+---
+
 # Eagle 1.0.4 (80)
 
 Eagle 1.0.4 is the stable release with the Island and Dock gallery work from 1.0.3, the visual refresh, and the stability fixes completed since the last public build.

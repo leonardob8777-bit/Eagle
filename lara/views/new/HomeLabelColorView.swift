@@ -157,18 +157,18 @@ struct HomeLabelColorView: View {
                 previewCard
                 colorCard
                 scopeCard
-
-                if !mgr.dsready {
-                    LaraAccessView(compact: true)
-                }
-
-                applyButton
-                restoreButton
                 diagnosticsCard
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        // Apply stays fixed at the bottom, in reach of the thumb; Prepare takes its place until ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            EagleApplyBar(ready: mgr.dsready) {
+                applyButton
+                restoreButton
+            }
+        }
+        .eagleScreenBackdrop()
         .navigationTitle(LaraL10n.text(en: "App Name Color", es: "Color de nombres"))
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isApplying)
@@ -188,6 +188,7 @@ struct HomeLabelColorView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .accessibilityElement(children: .combine)
                 }
+                .transition(.eagleWorking)
             }
         }
         .onAppear(perform: reconcileState)
@@ -242,14 +243,20 @@ struct HomeLabelColorView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(18)
-        .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0.94), Color.gray.opacity(0.26)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-        )
+        // A solid black base under the gradient: it looks exactly as before on black, and the backdrop
+        // no longer shows through the card's lighter corner.
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.black)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [Color.black.opacity(0.94), Color.gray.opacity(0.26)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                }
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1)
@@ -339,6 +346,8 @@ struct HomeLabelColorView: View {
                 LaraL10n.text(en: "Current Home page", es: "Página de inicio actual"),
                 systemImage: "textformat"
             )
+            // Keeps the "Aa" symbol in every language (it is redrawn as 格式 in Chinese).
+            .environment(\.locale, Locale(identifier: "en"))
             .font(.headline)
             .foregroundStyle(.indigo)
 
@@ -376,14 +385,11 @@ struct HomeLabelColorView: View {
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: 52)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(EagleVisualTheme.actionFill)
-        .foregroundStyle(EagleVisualTheme.actionText)
+        .buttonStyle(EagleApplyButtonStyle(busy: isApplying))
         .disabled(
             isApplying || !mgr.dsready || mgr.rcSafetyLocked ||
             !supportedDevice || !policyAllowsApply
         )
-        .opacity(mgr.dsready && supportedDevice && policyAllowsApply ? 1 : 0.55)
     }
 
     private var restoreButton: some View {

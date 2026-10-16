@@ -1,151 +1,33 @@
 import SwiftUI
 import UIKit
-import CryptoKit
 import Combine
 
-private enum DockGalleryStyle: Int, CaseIterable, Identifiable {
-    case bubblegum = 15
-    case springfield = 16
-    case bikiniBottom = 17
-    case duckMood = 28
-    case blueScreen = 29
-    case walkingFlame = 30
+private typealias DockGalleryStyle = EagleDockGalleryBuiltInTheme
 
-    var id: Int { rawValue }
+private extension EagleDockGalleryBuiltInTheme {
     var title: String {
-        switch self {
-        case .bubblegum:
-            return LaraL10n.text(en: "Bubblegum", es: "Chicle")
-        case .springfield:
-            return "Springfield"
-        case .bikiniBottom:
-            return LaraL10n.text(en: "Bikini Bottom", es: "Fondo de Bikini")
-        case .duckMood:
-            return LaraL10n.text(en: "Duck Mood", es: "Humor de pato")
-        case .blueScreen:
-            return LaraL10n.text(en: "Blue Screen", es: "Pantalla azul")
-        case .walkingFlame:
-            return LaraL10n.text(en: "Walking Flame", es: "Llama ambulante")
-        }
+        let text = titleText
+        if self == .springfield { return text.en }
+        return LaraL10n.text(en: text.en, es: text.es)
     }
+
     var subtitle: String {
-        switch self {
-        case .bubblegum:
-            return LaraL10n.text(
-                en: "Pink and yellow bubbles",
-                es: "Burbujas rosas y amarillas"
-            )
-        case .springfield:
-            return LaraL10n.text(
-                en: "Bright blue animated city",
-                es: "Ciudad animada azul brillante"
-            )
-        case .bikiniBottom:
-            return LaraL10n.text(
-                en: "Colorful underwater neighborhood",
-                es: "Vecindario submarino colorido"
-            )
-        case .duckMood:
-            return LaraL10n.text(en: "Classic animated duck close-up", es: "Primer plano de pato animado clásico")
-        case .blueScreen:
-            return LaraL10n.text(en: "Electric blue system portrait", es: "Retrato de sistema azul eléctrico")
-        case .walkingFlame:
-            return LaraL10n.text(en: "Surreal street fire portrait", es: "Retrato surrealista de fuego urbano")
-        }
+        let text = subtitleText
+        return LaraL10n.text(en: text.en, es: text.es)
     }
-    var assetName: String {
-        switch self {
-        case .bubblegum: return "DockGalleryBubblegum"
-        case .springfield: return "DockGallerySpringfield"
-        case .bikiniBottom: return "DockGalleryBikiniBottom"
-        case .duckMood: return "DockGalleryDuckMood"
-        case .blueScreen: return "DockGalleryBlueScreen"
-        case .walkingFlame: return "DockGalleryWalkingFlame"
-        }
-    }
+
     var accent: Color {
-        switch self {
-        case .bubblegum:
-            return Color(red: 1.0, green: 0.18, blue: 0.62)
-        case .springfield:
-            return Color(red: 0.0, green: 0.64, blue: 1.0)
-        case .bikiniBottom:
-            return Color(red: 0.0, green: 0.75, blue: 0.92)
-        case .duckMood:
-            return Color(red: 1.0, green: 0.47, blue: 0.08)
-        case .blueScreen:
-            return Color(red: 0.10, green: 0.28, blue: 1.0)
-        case .walkingFlame:
-            return Color(red: 1.0, green: 0.30, blue: 0.06)
-        }
-    }
-    var rgb: (Int32, Int32, Int32) {
-        switch self {
-        case .bubblegum: return (255, 45, 158)
-        case .springfield: return (0, 164, 255)
-        case .bikiniBottom: return (0, 191, 235)
-        case .duckMood: return (255, 120, 20)
-        case .blueScreen: return (26, 71, 255)
-        case .walkingFlame: return (255, 77, 15)
-        }
-    }
-
-    var isAnimated: Bool {
-        return false
-    }
-
-    private var animationAssetPrefix: String? {
-        nil
-    }
-
-    func previewAsset(at date: Date) -> String {
-        guard let animationAssetPrefix else { return assetName }
-        let frame = Int(date.timeIntervalSinceReferenceDate * 6.0) % 17 + 1
-        return String(format: "%@%02d", animationAssetPrefix, frame)
+        let components = accentComponents
+        return Color(red: components.red, green: components.green, blue: components.blue)
     }
 }
 
-private struct RemoteDockGalleryCatalog: Decodable, Sendable {
-    let schemaVersion: Int
-    let themes: [RemoteDockGalleryTheme]
-}
+private typealias RemoteDockGalleryTheme = EagleDockGalleryTheme
 
-private struct RemoteDockGalleryTheme: Decodable, Identifiable, Hashable, Sendable {
-    let id: String
-    let version: Int
-    let title: String
-    let titleES: String
-    let subtitle: String
-    let subtitleES: String
-    let accent: String
-    let previewURL: URL
-    let animatedPreviewURL: URL?
-    let packageURL: URL
-    let sha256: String
-    let byteCount: Int
-    let frameCount: Int
-    let fps: Double
-    let width: Int
-    let height: Int
-
+private extension EagleDockGalleryTheme {
     var localizedTitle: String { LaraL10n.text(en: title, es: titleES) }
     var localizedSubtitle: String { LaraL10n.text(en: subtitle, es: subtitleES) }
-    var presentationPreviewURL: URL {
-        let source = frameCount > 1 ? (animatedPreviewURL ?? previewURL) : previewURL
-        var components = URLComponents(url: source, resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(
-            name: "preview",
-            value: "\(version)-\(frameCount > 1 ? "animated" : "static")"
-        )]
-        return components?.url ?? source
-    }
     var color: Color { Color(eagleHex: accent) }
-    var rgb: (Int32, Int32, Int32) {
-        let hex = accent.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        let value = UInt32(hex, radix: 16) ?? 0xDB40E0
-        return (Int32((value >> 16) & 0xff), Int32((value >> 8) & 0xff), Int32(value & 0xff))
-    }
-    var duration: Double { Double(frameCount) / fps }
 }
 
 private extension Color {
@@ -157,119 +39,6 @@ private extension Color {
             green: Double((value >> 8) & 0xff) / 255.0,
             blue: Double(value & 0xff) / 255.0
         )
-    }
-}
-
-@MainActor
-private final class RemoteDockGalleryStore: ObservableObject {
-    static let shared = RemoteDockGalleryStore()
-    @Published private(set) var themes: [RemoteDockGalleryTheme] = []
-    @Published private(set) var loading = false
-    @Published private(set) var downloadingID: String?
-    @Published private(set) var errorMessage: String?
-
-    private let catalogURL = URL(string: "https://raw.githubusercontent.com/leonardob8777-bit/Eagle-Gallery/main/catalogs/dock-v1.json?catalog=21")!
-
-    func load(force: Bool = false) async {
-        if loading || (!force && !themes.isEmpty) { return }
-        loading = true
-        errorMessage = nil
-        defer { loading = false }
-        do {
-            var request = URLRequest(url: catalogURL)
-            request.timeoutInterval = 25
-            request.cachePolicy = force ? .reloadIgnoringLocalCacheData : .returnCacheDataElseLoad
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  data.count <= 512 * 1024 else { throw URLError(.badServerResponse) }
-            let catalog = try JSONDecoder().decode(RemoteDockGalleryCatalog.self, from: data)
-            guard catalog.schemaVersion == 1 else { throw URLError(.cannotParseResponse) }
-            themes = catalog.themes.filter(Self.isSupported)
-        } catch {
-            errorMessage = LaraL10n.text(
-                en: "The online collection could not be loaded.",
-                es: "No se pudo cargar la colección en línea."
-            )
-        }
-    }
-
-    func prepare(_ theme: RemoteDockGalleryTheme) async throws -> URL {
-        let destination = try cacheDirectory(for: theme)
-        if Self.validFrames(in: destination, theme: theme) { return destination }
-        downloadingID = theme.id
-        defer { downloadingID = nil }
-
-        var request = URLRequest(url: theme.packageURL)
-        request.timeoutInterval = 90
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode),
-              data.count == theme.byteCount,
-              data.count <= 30 * 1024 * 1024 else { throw URLError(.badServerResponse) }
-        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        guard digest.caseInsensitiveCompare(theme.sha256) == .orderedSame else {
-            throw URLError(.secureConnectionFailed)
-        }
-
-        let archive = try ZipArchive(data: data)
-        let expected = Set((1...theme.frameCount).map { String(format: "frame%02d.png", $0) })
-        let files = archive.entries.filter { !$0.isDirectory }
-        guard Set(files.map(\.path)) == expected else { throw URLError(.cannotDecodeContentData) }
-
-        let fm = FileManager.default
-        let staging = destination.deletingLastPathComponent()
-            .appendingPathComponent(".\(theme.id)-\(UUID().uuidString)", isDirectory: true)
-        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-        do {
-            for entry in files {
-                let frameData = try archive.extract(entry)
-                guard let image = UIImage(data: frameData),
-                      image.cgImage?.width == theme.width,
-                      image.cgImage?.height == theme.height else {
-                    throw URLError(.cannotDecodeContentData)
-                }
-                try frameData.write(to: staging.appendingPathComponent(entry.path), options: .atomic)
-            }
-            guard Self.validFrames(in: staging, theme: theme) else {
-                throw URLError(.cannotDecodeContentData)
-            }
-            if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
-            try fm.moveItem(at: staging, to: destination)
-        } catch {
-            try? fm.removeItem(at: staging)
-            throw error
-        }
-        return destination
-    }
-
-    private func cacheDirectory(for theme: RemoteDockGalleryTheme) throws -> URL {
-        let root = try FileManager.default.url(
-            for: .cachesDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        ).appendingPathComponent("EagleGallery/Dock", isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        return root.appendingPathComponent("\(theme.id)-v\(theme.version)", isDirectory: true)
-    }
-
-    private static func isSupported(_ theme: RemoteDockGalleryTheme) -> Bool {
-        ((theme.frameCount == 17 && theme.fps == 6) ||
-         (theme.frameCount == 1 && theme.fps == 1)) &&
-            theme.width == 1146 && theme.height == 318 &&
-            theme.byteCount > 0 && theme.byteCount <= 30 * 1024 * 1024
-    }
-
-    private static func validFrames(in directory: URL, theme: RemoteDockGalleryTheme) -> Bool {
-        guard isSupported(theme) else { return false }
-        return (1...theme.frameCount).allSatisfy { index in
-            let url = directory.appendingPathComponent(String(format: "frame%02d.png", index))
-            guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-                  let image = UIImage(data: data) else { return false }
-            return image.cgImage?.width == theme.width && image.cgImage?.height == theme.height
-        }
     }
 }
 
@@ -566,35 +335,38 @@ private final class DockGalleryExecutor {
     }
 }
 
-struct DockGalleryView: View {
-    private enum MediaFilter: String, CaseIterable {
-        case still = "Static"
-        case live = "Live"
-        case favorites = "Favorites"
-
-        var title: String {
-            self == .favorites ? "Saves" : rawValue
-        }
-
-        var icon: String {
-            switch self {
-            case .still: return "sparkles"
-            case .live: return "play.circle"
-            case .favorites: return "heart"
-            }
-        }
-
-        func includes(_ theme: RemoteDockGalleryTheme, favorites: Set<String>) -> Bool {
-            switch self {
-            case .still: return theme.frameCount == 1
-            case .live: return theme.frameCount > 1
-            case .favorites: return favorites.contains(theme.id)
-            }
-        }
+/// Transitional adapter: Eagle owns the call boundary while the existing
+/// protected executor continues to perform the operation without changes.
+@MainActor
+private struct CurrentDockGalleryPort: EagleDockGalleryPort {
+    func applyRemote(
+        _ request: EagleDockGalleryApplyRequest
+    ) async -> EagleDockGalleryOutcome {
+        let result = await DockGalleryExecutor.shared.applyRemote(
+            request.theme,
+            directory: request.directory,
+            intensity: request.intensity
+        )
+        return EagleDockGalleryOutcome(
+            succeeded: result.succeeded,
+            message: result.message
+        )
     }
 
+    func restore() async -> EagleDockGalleryOutcome {
+        let result = await DockGalleryExecutor.shared.restore()
+        return EagleDockGalleryOutcome(
+            succeeded: result.succeeded,
+            message: result.message
+        )
+    }
+}
+
+struct DockGalleryView: View {
+    private typealias MediaFilter = EagleDockGalleryMediaFilter
+
     @ObservedObject private var manager = laramgr.shared
-    @StateObject private var remoteGallery = RemoteDockGalleryStore.shared
+    @StateObject private var remoteGallery = EagleGalleryServices.dock
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("eagle.dockGallery.selectedStyle")
@@ -610,14 +382,39 @@ struct DockGalleryView: View {
     @AppStorage("eagle.dockGallery.lastViewedStaticID") private var lastViewedStaticID = ""
     @AppStorage("eagle.dockGallery.lastViewedLiveID") private var lastViewedLiveID = ""
     @State private var isApplying = false
-    @State private var selectedRemoteID = ""
-    @State private var mediaFilter: MediaFilter = .still
-    @State private var rememberedSelections: [MediaFilter: String] = [:]
-    @State private var shuffledRemoteIDs: [String] = []
-    @State private var visitStarted = false
+    @State private var session: EagleDockGallerySession = .init()
     @State private var needsNewVisitOnResume = false
-    @State private var readyRemotePreviewID = ""
     @State private var showAccessSetup = false
+
+    private var selectedRemoteID: String {
+        get { session.selectedRemoteID }
+        nonmutating set { session.selectedRemoteID = newValue }
+    }
+
+    private var mediaFilter: MediaFilter {
+        get { session.mediaFilter }
+        nonmutating set { session.mediaFilter = newValue }
+    }
+
+    private var rememberedSelections: EagleDockGallerySelectionMemory {
+        get { session.rememberedSelections }
+        nonmutating set { session.rememberedSelections = newValue }
+    }
+
+    private var shuffledRemoteIDs: [String] {
+        get { session.shuffledRemoteIDs }
+        nonmutating set { session.shuffledRemoteIDs = newValue }
+    }
+
+    private var visitStarted: Bool {
+        get { session.visitStarted }
+        nonmutating set { session.visitStarted = newValue }
+    }
+
+    private var readyRemotePreviewID: String {
+        get { session.readyRemotePreviewID }
+        nonmutating set { session.readyRemotePreviewID = newValue }
+    }
 
     var body: some View {
         ScrollView {
@@ -629,11 +426,27 @@ struct DockGalleryView: View {
             .padding(.bottom, 120)
         }
         .scrollIndicators(.hidden)
-        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        // The selected theme's Apply stays fixed at the bottom, in reach of the thumb.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let theme = selectedRemoteTheme {
+                EagleApplyBar {
+                    remoteActionButton(theme)
+                }
+            }
+        }
+        .eagleScreenBackdrop()
         .navigationTitle(LaraL10n.text(en: "Dock Gallery", es: "Galería Dock"))
+        // Refresh in the navigation bar, as in Island Gallery.
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { Task { await remoteGallery.load(force: true) } } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(remoteGallery.loading || isApplying)
+                .accessibilityLabel(LaraL10n.text(en: "Refresh collection", es: "Actualizar colección"))
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showAccessSetup) {
             NavigationStack {
                 ScrollView {
@@ -642,7 +455,7 @@ struct DockGalleryView: View {
                     }
                     .padding(20)
                 }
-                .background(Color(uiColor: .systemGroupedBackground))
+                .eagleScreenBackdrop()
                 .navigationTitle(LaraL10n.text(en: "Prepare Eagle", es: "Preparar Eagle"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -655,37 +468,39 @@ struct DockGalleryView: View {
             }
         }
         .onAppear {
-            if !visitStarted { beginGalleryVisit() }
-            if DockGalleryStyle(rawValue: selectedRaw) == nil {
-                selectedRaw = DockGalleryStyle.bubblegum.rawValue
-            }
-            if hasVerifiedDock,
-               DockGalleryStyle(rawValue: activeRaw) != nil,
-               activeDockModeRaw == 1 {
-                // 1.0.2 stored Gallery artwork as generic Dock Glow. Preserve
-                // the verified selection once, then use the exact style mode.
-                activeDockModeRaw = activeRaw
-            } else if !hasVerifiedDock || DockGalleryStyle(rawValue: activeDockModeRaw) == nil {
-                activeRaw = 0
-            }
-            if hasVerifiedDock, activeRemoteID.isEmpty,
-               let legacyID = Self.remoteID(forLegacyMode: activeDockModeRaw) {
-                activeRemoteID = legacyID
-            }
+            EagleDockGalleryLifecycle.appear(
+                visitStarted: { visitStarted },
+                beginVisit: { beginGalleryVisit() }
+            )
+            EagleDockGalleryStoredSelection.reconcile(
+                selectedRaw: { selectedRaw },
+                setSelectedRaw: { selectedRaw = $0 },
+                hasVerifiedDock: { hasVerifiedDock },
+                activeRaw: { activeRaw },
+                setActiveRaw: { activeRaw = $0 },
+                activeDockModeRaw: { activeDockModeRaw },
+                setActiveDockModeRaw: { activeDockModeRaw = $0 },
+                activeRemoteID: { activeRemoteID },
+                setActiveRemoteID: { activeRemoteID = $0 }
+            )
         }
         .onDisappear {
-            // Returning from access setup must keep the theme being prepared.
-            if !showAccessSetup { visitStarted = false }
+            EagleDockGalleryLifecycle.disappear(
+                showAccessSetup: { showAccessSetup },
+                setVisitStarted: { visitStarted = $0 }
+            )
         }
         .onChange(of: scenePhase) { phase in
-            if phase == .background, visitStarted {
-                needsNewVisitOnResume = true
-            } else if phase == .active, needsNewVisitOnResume {
-                needsNewVisitOnResume = false
-                if visitStarted, !showAccessSetup, !isApplying, remoteGallery.downloadingID == nil {
-                    beginGalleryVisit()
-                }
-            }
+            EagleDockGalleryLifecycle.sceneChanged(
+                phase == .background ? .background : (phase == .active ? .active : .other),
+                visitStarted: { visitStarted },
+                needsNewVisitOnResume: { needsNewVisitOnResume },
+                setNeedsNewVisitOnResume: { needsNewVisitOnResume = $0 },
+                showAccessSetup: { showAccessSetup },
+                isApplying: { isApplying },
+                downloadingID: { remoteGallery.downloadingID },
+                beginVisit: { beginGalleryVisit() }
+            )
         }
         .task {
             await remoteGallery.load()
@@ -761,9 +576,9 @@ struct DockGalleryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(active ? .red : EagleVisualTheme.actionFill)
-            .foregroundStyle(active ? Color.white : EagleVisualTheme.actionText)
+            .buttonStyle(EagleApplyButtonStyle(fill: active ? .red : EagleVisualTheme.actionFill,
+                                               text: active ? .white : EagleVisualTheme.actionText,
+                                               busy: isApplying))
             .disabled(isApplying || !manager.dsready)
         }
         .padding(14)
@@ -800,7 +615,6 @@ struct DockGalleryView: View {
             }
         } else if !remoteGallery.themes.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                collectionHeader
                 mediaFilterControl
 
                 if let theme = selectedRemoteTheme {
@@ -810,7 +624,6 @@ struct DockGalleryView: View {
                         y: $positionY,
                         disabled: isApplying || remoteGallery.downloadingID != nil
                     )
-                    remoteActionButton(theme)
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: mediaFilter == .favorites ? "heart" : "photo")
@@ -831,10 +644,12 @@ struct DockGalleryView: View {
     private var glowIntensityControl: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label(LaraL10n.text(en: "Dock light", es: "Luz del Dock"), systemImage: "sun.max.fill")
+                Label(LaraL10n.text(en: "Shadow", es: "Sombra"), systemImage: "circle.lefthalf.filled")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text("\(Int((glowIntensity * 100).rounded()))%")
+                Text(glowIntensity <= 0.005
+                    ? LaraL10n.text(en: "Off", es: "Sin sombra")
+                    : "\(Int((glowIntensity * 100).rounded()))%")
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundStyle(.secondary)
             }
@@ -886,12 +701,13 @@ struct DockGalleryView: View {
                         background: .clear,
                         presentationMotion: theme.frameCount == 1,
                         onReady: { ready in
-                            guard selectedRemoteTheme?.id == theme.id else { return }
-                            if ready {
-                                readyRemotePreviewID = theme.id
-                            } else if readyRemotePreviewID == theme.id {
-                                readyRemotePreviewID = ""
-                            }
+                            EagleDockGalleryPreviewReadiness.update(
+                                ready,
+                                themeID: theme.id,
+                                selectedThemeID: { selectedRemoteTheme?.id },
+                                readyPreviewID: { readyRemotePreviewID },
+                                setReadyPreviewID: { readyRemotePreviewID = $0 }
+                            )
                         }
                     )
                     .id("dock-preview-\(theme.id)")
@@ -944,35 +760,25 @@ struct DockGalleryView: View {
             HStack(spacing: 8) {
                 Text(theme.localizedTitle)
                     .font(.title3.bold())
-                    .multilineTextAlignment(.center)
                     .lineLimit(2)
-                Label(
-                    theme.frameCount > 1 ? "Live" : "Static",
-                    systemImage: theme.frameCount > 1 ? "play.fill" : "photo.fill"
-                )
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(.secondary)
                 if active {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundStyle(theme.color)
                 }
+                Spacer(minLength: 6)
                 Button {
                     toggleFavorite(theme)
                 } label: {
                     Image(systemName: favoriteIDs.contains(theme.id) ? "heart.fill" : "heart")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 16))
+                        .foregroundStyle(favoriteIDs.contains(theme.id) ? Color.pink : .primary)
+                        .eagleSymbolPop(favoriteIDs.contains(theme.id))
                         .frame(width: 44, height: 44)
-                        .contentShape(Circle())
+                        .background(Color.primary.opacity(0.05), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(EaglePressableStyle(kind: .swatch))
                 .disabled(isApplying || remoteGallery.downloadingID != nil)
-                .scaleEffect(favoriteIDs.contains(theme.id) ? 1.06 : 1)
-                .animation(
-                    reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.72),
-                    value: favoriteIDs.contains(theme.id)
-                )
                 .accessibilityLabel(favoriteIDs.contains(theme.id)
                     ? LaraL10n.text(en: "Remove from favorites", es: "Quitar de favoritos")
                     : LaraL10n.text(en: "Add to favorites", es: "Añadir a favoritos"))
@@ -984,7 +790,7 @@ struct DockGalleryView: View {
                 Text(remotePositionText)
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .frame(minWidth: 46)
+                    .frame(minWidth: 54)
                 remoteArrowButton(symbol: "chevron.right", step: 1)
             }
             .frame(maxWidth: .infinity)
@@ -1024,9 +830,7 @@ struct DockGalleryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(EagleVisualTheme.actionFill)
-            .foregroundStyle(EagleVisualTheme.actionText)
+            .buttonStyle(EagleApplyButtonStyle(busy: downloading || isApplying))
 
             if active && manager.dsready {
                 Button(role: .destructive) {
@@ -1049,42 +853,44 @@ struct DockGalleryView: View {
     }
 
     private var selectedRemoteTheme: RemoteDockGalleryTheme? {
-        visibleRemoteThemes.first(where: { $0.id == selectedRemoteID }) ??
-            visibleRemoteThemes.first
+        EagleDockGallerySelection.selected(in: visibleRemoteThemes, selectedID: selectedRemoteID)
     }
 
     private var visibleRemoteThemes: [RemoteDockGalleryTheme] {
         let favorites = favoriteIDs
-        let themesByID = Dictionary(remoteGallery.themes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return shuffledRemoteIDs.compactMap { themesByID[$0] }
-            .filter { mediaFilter.includes($0, favorites: favorites) }
+        return EagleDockGalleryCollection.visible(
+            themes: remoteGallery.themes,
+            orderedIDs: shuffledRemoteIDs,
+            filter: mediaFilter,
+            favorites: favorites
+        )
     }
 
     private var favoriteIDs: Set<String> {
-        guard let data = favoriteIDsJSON.data(using: .utf8),
-              let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
-        return Set(ids)
+        EagleDockGalleryFavorites.decode(favoriteIDsJSON)
     }
 
     private func toggleFavorite(_ theme: RemoteDockGalleryTheme) {
-        var ids = favoriteIDs
-        if !ids.insert(theme.id).inserted { ids.remove(theme.id) }
-        guard let data = try? JSONEncoder().encode(ids.sorted()),
-              let json = String(data: data, encoding: .utf8) else { return }
-        // Store catalog IDs, so favorites survive app restarts and asset updates.
-        favoriteIDsJSON = json
-        synchronizeRemoteSelection()
-        UISelectionFeedbackGenerator().selectionChanged()
+        EagleDockGalleryInteractions.toggleFavorite(
+            theme,
+            readFavorites: { favoriteIDs },
+            writeFavoritesJSON: { favoriteIDsJSON = $0 },
+            synchronize: { synchronizeRemoteSelection() },
+            feedback: { UISelectionFeedbackGenerator().selectionChanged() }
+        )
     }
 
     private func selectMediaFilter(_ filter: MediaFilter) {
-        guard mediaFilter != filter, !isApplying, remoteGallery.downloadingID == nil else { return }
-        rememberedSelections[mediaFilter] = selectedRemoteTheme?.id
-        readyRemotePreviewID = ""
-        mediaFilter = filter
-        selectedRemoteID = rememberedSelections[filter] ?? ""
-        synchronizeRemoteSelection()
-        UISelectionFeedbackGenerator().selectionChanged()
+        EagleDockGalleryInteractions.selectCategory(
+            filter,
+            readSession: { session },
+            writeSession: { session = $0 },
+            isApplying: { isApplying },
+            downloadingID: { remoteGallery.downloadingID },
+            selectedThemeID: { selectedRemoteTheme?.id },
+            synchronize: { synchronizeRemoteSelection() },
+            feedback: { UISelectionFeedbackGenerator().selectionChanged() }
+        )
     }
 
     private func animatedSelectMediaFilter(_ filter: MediaFilter) {
@@ -1106,47 +912,33 @@ struct DockGalleryView: View {
     }
 
     private func beginGalleryVisit() {
-        visitStarted = true
-        shuffledRemoteIDs = []
-        selectedRemoteID = ""
-        readyRemotePreviewID = ""
-        rememberedSelections = [:]
-        mediaFilter = .still
-        synchronizeRemoteSelection()
+        EagleDockGalleryInteractions.beginVisit(
+            readSession: { session },
+            writeSession: { session = $0 },
+            synchronize: { synchronizeRemoteSelection() }
+        )
     }
 
     private func synchronizeRemoteSelection() {
-        let catalogIDs = Set(remoteGallery.themes.map(\.id))
-        let retainedIDs = shuffledRemoteIDs.filter { catalogIDs.contains($0) }
-        let retainedSet = Set(retainedIDs)
-        let additions = Array(catalogIDs.subtracting(retainedSet)).shuffled()
-        var order = retainedIDs + additions
-        if retainedIDs.isEmpty {
-            // Avoid opening either category on the last theme seen there.
-            for (filter, lastID) in [(MediaFilter.still, lastViewedStaticID), (.live, lastViewedLiveID)] {
-                let categoryIDs = Set(remoteGallery.themes.filter {
-                    filter.includes($0, favorites: [])
-                }.map(\.id))
-                let indices = order.indices.filter { categoryIDs.contains(order[$0]) }
-                if indices.count > 1, let first = indices.first, order[first] == lastID {
-                    order.swapAt(first, indices[1])
-                }
-            }
-        }
-        if shuffledRemoteIDs != order { shuffledRemoteIDs = order }
-        if !visibleRemoteThemes.contains(where: { $0.id == selectedRemoteID }) {
-            readyRemotePreviewID = ""
-            selectedRemoteID = visibleRemoteThemes.first?.id ?? ""
-        }
-        rememberViewedTheme()
+        EagleDockGallerySynchronization.synchronize(
+            catalog: { remoteGallery.themes },
+            readSession: { session },
+            writeSession: { session = $0 },
+            shuffle: { $0.shuffled() },
+            lastViewedStaticID: { lastViewedStaticID },
+            lastViewedLiveID: { lastViewedLiveID },
+            visibleThemes: { visibleRemoteThemes },
+            rememberViewedTheme: { rememberViewedTheme() }
+        )
     }
 
     private func rememberViewedTheme() {
-        guard let theme = selectedRemoteTheme else { return }
-        if theme.frameCount > 1 {
-            lastViewedLiveID = theme.id
-        } else {
-            lastViewedStaticID = theme.id
+        guard let lastViewed = EagleDockGallerySelection.lastViewed(selectedRemoteTheme) else { return }
+        switch lastViewed {
+        case .live(let id):
+            lastViewedLiveID = id
+        case .still(let id):
+            lastViewedStaticID = id
         }
     }
 
@@ -1173,24 +965,38 @@ struct DockGalleryView: View {
             Button {
                 Task { await remoteGallery.load(force: true) }
             } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 40, height: 40)
-                    .background(Color.primary.opacity(0.08), in: Circle())
+                // Turns while the collection refreshes (from the clock, so it really stops at the end).
+                EagleAmbientTimeline(paused: !remoteGallery.loading) { context in
+                    Image(systemName: "arrow.clockwise")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .rotationEffect(.degrees(remoteGallery.loading
+                            ? context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 0.9) / 0.9 * 360
+                            : 0))
+                }
+                .frame(width: 40, height: 40)
+                .background(Color.primary.opacity(0.08), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(EaglePressableStyle())
             .disabled(remoteGallery.loading)
             .accessibilityLabel(LaraL10n.text(en: "Refresh collection", es: "Actualizar colección"))
         }
-        .padding(.horizontal, 2)
-        .padding(.bottom, 2)
+        .padding(.leading, 12)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        // On its own opaque surface, like the filters below it, so it reads over the light top of the
+        // backdrop as well as over the dark.
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
     }
 
     private var remotePositionText: String {
         let themes = visibleRemoteThemes
-        let current = themes.firstIndex(where: { $0.id == selectedRemoteID }) ?? 0
-        return "\(current + 1) / \(themes.count)"
+        let current = EagleDockGallerySelection.currentIndex(in: themes, selectedID: selectedRemoteID)
+        return String(format: "%02d", current + 1) + " / " + String(format: "%02d", themes.count)
     }
 
     private func remoteArrowButton(symbol: String, step: Int) -> some View {
@@ -1198,12 +1004,12 @@ struct DockGalleryView: View {
             animatedStepRemote(step)
         } label: {
             Image(systemName: symbol)
-                .font(.subheadline.weight(.bold))
+                .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(.primary)
                 .frame(width: 44, height: 44)
-                .background(Color.primary.opacity(0.08), in: Circle())
+                .background(Color.primary.opacity(0.06), in: Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle())
         .disabled(isApplying || remoteGallery.downloadingID != nil || visibleRemoteThemes.count < 2)
         .accessibilityLabel(step < 0
             ? LaraL10n.text(en: "Previous theme", es: "Tema anterior")
@@ -1211,15 +1017,16 @@ struct DockGalleryView: View {
     }
 
     private func stepRemote(_ step: Int) {
-        guard !isApplying, remoteGallery.downloadingID == nil else { return }
-        let themes = visibleRemoteThemes
-        guard themes.count > 1 else { return }
-        let current = themes.firstIndex(where: { $0.id == selectedRemoteID }) ?? 0
-        let next = (current + step + themes.count) % themes.count
-        readyRemotePreviewID = ""
-        selectedRemoteID = themes[next].id
-        rememberViewedTheme()
-        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        EagleDockGalleryInteractions.step(
+            step,
+            readSession: { session },
+            writeSession: { session = $0 },
+            isApplying: { isApplying },
+            downloadingID: { remoteGallery.downloadingID },
+            visibleThemes: { visibleRemoteThemes },
+            rememberViewedTheme: { rememberViewedTheme() },
+            feedback: { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
+        )
     }
 
     private func animatedStepRemote(_ step: Int) {
@@ -1307,7 +1114,7 @@ struct DockGalleryView: View {
                     Circle().strokeBorder(.primary.opacity(0.08), lineWidth: 1)
                 }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle())
         .disabled(isApplying)
         .accessibilityLabel(delta < 0
             ? LaraL10n.text(en: "Previous theme", es: "Tema anterior")
@@ -1323,62 +1130,54 @@ struct DockGalleryView: View {
     }
 
     private func apply(_ style: DockGalleryStyle) {
-        guard !isApplying else { return }
-        selectedRaw = style.rawValue
-        isApplying = true
-        Task { @MainActor in
-            let result = await DockGalleryExecutor.shared.apply(style, intensity: glowIntensity)
-            isApplying = false
-            if result.succeeded {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            }
-            EagleNotifications.shared.result(result.succeeded, title: "Dock Gallery", message: result.message)
-        }
+        EagleDockGalleryBuiltInApplyFlow.start(
+            style,
+            isApplying: { isApplying },
+            selectStyle: { selectedRaw = $0 },
+            setApplying: { isApplying = $0 },
+            intensity: { glowIntensity },
+            apply: {
+                let result = await DockGalleryExecutor.shared.apply($0, intensity: $1)
+                return EagleDockGalleryOutcome(succeeded: result.succeeded, message: result.message)
+            },
+            successFeedback: { UINotificationFeedbackGenerator().notificationOccurred(.success) },
+            notify: { EagleNotifications.shared.result($0, title: "Dock Gallery", message: $1) }
+        )
     }
 
     private func applyRemote(_ theme: RemoteDockGalleryTheme) {
-        guard !isApplying, remoteGallery.downloadingID == nil else { return }
-        let requestedIntensity = glowIntensity
-        isApplying = true
-        Task { @MainActor in
-            do {
-                let directory = try await remoteGallery.prepare(theme)
-                let result = await DockGalleryExecutor.shared.applyRemote(theme, directory: directory, intensity: requestedIntensity)
-                if result.succeeded {
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                }
-                EagleNotifications.shared.result(result.succeeded, title: "Dock Gallery", message: result.message)
-            } catch {
-                EagleNotifications.shared.result(false, title: "Dock Gallery", message: LaraL10n.text(
+        EagleDockGalleryApplyFlow.start(
+            theme,
+            isApplying: { isApplying },
+            downloadingID: { remoteGallery.downloadingID },
+            intensity: { glowIntensity },
+            setApplying: { isApplying = $0 },
+            prepare: { try await remoteGallery.prepare($0) },
+            apply: {
+                await EagleDockGalleryCore(port: CurrentDockGalleryPort()).applyRemote($0)
+            },
+            successFeedback: { UINotificationFeedbackGenerator().notificationOccurred(.success) },
+            notify: { EagleNotifications.shared.result($0, title: "Dock Gallery", message: $1) },
+            preparationFailureMessage: {
+                LaraL10n.text(
                     en: "The original theme package could not be downloaded or verified. Nothing changed.",
                     es: "No se pudo descargar o verificar el paquete original. Nada cambió."
-                ))
+                )
             }
-            isApplying = false
-        }
+        )
     }
 
     private func restore() {
-        guard !isApplying else { return }
-        isApplying = true
-        Task { @MainActor in
-            let result = await DockGalleryExecutor.shared.restore()
-            isApplying = false
-            if result.succeeded {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            }
-            EagleNotifications.shared.result(result.succeeded, title: "Dock Gallery", message: result.message)
-        }
+        EagleDockGalleryRestoreFlow.start(
+            isApplying: { isApplying },
+            setApplying: { isApplying = $0 },
+            restore: { await EagleDockGalleryCore(port: CurrentDockGalleryPort()).restore() },
+            successFeedback: { UINotificationFeedbackGenerator().notificationOccurred(.success) },
+            notify: { EagleNotifications.shared.result($0, title: "Dock Gallery", message: $1) }
+        )
     }
 
     private static func remoteID(forLegacyMode mode: Int) -> String? {
-        [
-            15: "bubblegum", 16: "springfield", 17: "bikini-bottom",
-            18: "neon-chase", 19: "neon-drift", 20: "glitch-orbit",
-            21: "pop-glasses", 22: "inferno-wings", 23: "cool-cat",
-            24: "cyber-love", 25: "padded-room", 26: "noir-vision",
-            27: "thirsty-cat", 28: "duck-mood", 29: "blue-screen",
-            30: "walking-flame", 31: "prism-blur"
-        ][mode]
+        EagleDockGalleryStoredSelection.remoteID(forLegacyMode: mode)
     }
 }

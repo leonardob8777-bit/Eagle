@@ -684,7 +684,15 @@ struct EagleResonanceView: View {
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        // Once there is a result, Apply stays fixed at the bottom; Prepare takes its place until ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let profile = resonance.profile, let assets = resonance.assets {
+                EagleApplyBar(ready: mgr.sbxready, onPrepared: { styleManager.refreshCompatibility() }) {
+                    resonanceApplyButton(profile: profile, assets: assets)
+                }
+            }
+        }
+        .eagleScreenBackdrop()
         .navigationTitle("Resonance")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear {
@@ -848,7 +856,7 @@ struct EagleResonanceView: View {
                 .scaleEffect(1 + resonance.level * 0.045)
                 .animation(.spring(response: 0.18, dampingFraction: 0.55), value: resonance.level)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(EaglePressableStyle(kind: .card))
 
             HStack(spacing: 6) {
                 ForEach(0..<min(max(resonance.taps.count, 5), 16), id: \.self) { index in
@@ -873,7 +881,8 @@ struct EagleResonanceView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(EagleVisualTheme.actionFill)
-                .foregroundStyle(EagleVisualTheme.actionText)
+                // Grey while it waits for enough taps, instead of white on light grey.
+                .eagleProminentLabel()
                 .disabled(resonance.taps.count < 5 || resonance.isRendering)
             }
             errorText
@@ -938,32 +947,27 @@ struct EagleResonanceView: View {
             .background(Color(uiColor: .secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
 
-            if !mgr.sbxready {
-                LaraAccessView(compact: true) {
-                    styleManager.refreshCompatibility()
-                }
-            }
-
-            Button {
-                apply(profile: profile, assets: assets)
-            } label: {
-                Label(
-                    LaraL10n.text(en: "Apply Resonance", es: "Aplicar Resonance"),
-                    systemImage: "waveform.badge.plus"
-                )
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(EagleVisualTheme.actionFill)
-            .foregroundStyle(EagleVisualTheme.actionText)
-            .disabled(
-                !mgr.sbxready ||
-                styleManager.isWorking ||
-                ![includeWallpaper, includePasscode, includeCard].contains(true)
-            )
         }
+    }
+
+    private func resonanceApplyButton(profile: EagleResonanceProfile, assets: EagleResonanceAssets) -> some View {
+        Button {
+            apply(profile: profile, assets: assets)
+        } label: {
+            Label(
+                LaraL10n.text(en: "Apply Resonance", es: "Aplicar Resonance"),
+                systemImage: "waveform.badge.plus"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+        }
+        .buttonStyle(EagleApplyButtonStyle(busy: styleManager.isWorking))
+        .disabled(
+            !mgr.sbxready ||
+            styleManager.isWorking ||
+            ![includeWallpaper, includePasscode, includeCard].contains(true)
+        )
     }
 
     private func preview(_ assets: EagleResonanceAssets) -> some View {

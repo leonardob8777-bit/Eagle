@@ -413,8 +413,11 @@ struct SettingsView: View {
                 }
                 
                 if destination == .preferences {
-                Section(header: HeaderLabel(text: "App", icon: "gearshape"), footer: Text("If keep alive is enabled, the app will continue running even if it is minimized.")) {
-                    Toggle("Keep Alive", isOn: $keepAlive)
+                Section(header: HeaderLabel(text: LaraL10n.text(en: "App", es: "App"), icon: "gearshape"), footer: Text(LaraL10n.text(
+                    en: "If keep alive is enabled, the app will continue running even if it is minimized.",
+                    es: "Si Mantener activa está encendido, la app sigue funcionando aunque la minimices."
+                ))) {
+                    Toggle(LaraL10n.text(en: "Keep Alive", es: "Mantener activa"), isOn: $keepAlive)
                         .onChange(of: keepAlive) { _ in
                             if keepAlive {
                                 if !kaenabled { toggleka() }

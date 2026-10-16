@@ -178,6 +178,8 @@ struct HideDockIslandView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent)
+                    // The contrasting colour on the black/white fill, grey while disabled.
+                    .eagleProminentLabel()
                 }
                 if islandReadFailed {
                     Button(LaraL10n.text(en: "Retry Island status", es: "Reintentar estado de Island")) {
@@ -189,7 +191,7 @@ struct HideDockIslandView: View {
             .padding(20)
             .disabled(busy)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Hide Dock + Island")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(busy)

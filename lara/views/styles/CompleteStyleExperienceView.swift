@@ -47,7 +47,7 @@ struct CompleteStyleLivePreviewView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .eagleHeaderCard()
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
 
@@ -92,8 +92,7 @@ struct CompleteStyleLivePreviewView: View {
                             )
                             .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        .buttonStyle(EagleApplyButtonStyle(busy: manager.isWorking))
                         .disabled(!mgr.sbxready || manager.isWorking || components.isEmpty)
                     }
 
@@ -110,7 +109,7 @@ struct CompleteStyleLivePreviewView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .eagleScreenBackdrop()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(LaraL10n.text(en: "Close", es: "Cerrar")) { dismiss() }
@@ -351,6 +350,7 @@ struct CompleteStyleMixerView: View {
                     ))
                         .foregroundStyle(.secondary)
                 }
+                .eagleHeaderCard()
 
                 mixedPreview
 
@@ -376,12 +376,29 @@ struct CompleteStyleMixerView: View {
                 .background(Color(uiColor: .secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
 
-                if !mgr.sbxready {
-                    LaraAccessView(compact: true) {
-                        manager.refreshCompatibility()
-                    }
+                Button {
+                    showLivePreview = true
+                } label: {
+                    Label(LaraL10n.text(en: "Real preview", es: "Vista previa real"), systemImage: "eye.fill")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(EagleSecondaryButtonStyle())
 
+                Label(
+                    "Solo se guarda una acción para Deshacer. Los originales permanecen disponibles por separado.",
+                    systemImage: "checkmark.shield.fill"
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .eagleBackdropText()
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+            .padding(.bottom, 40)
+        }
+        // Apply (with its progress) stays fixed at the bottom; Prepare takes its place until ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            EagleApplyBar(ready: mgr.sbxready, onPrepared: { manager.refreshCompatibility() }) {
                 if manager.isWorking {
                     VStack(alignment: .leading, spacing: 9) {
                         HStack {
@@ -394,45 +411,20 @@ struct CompleteStyleMixerView: View {
                         ProgressView(value: manager.progress)
                             .tint(cardPack.secondary.color)
                     }
-                    .padding(16)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
 
-                VStack(spacing: 10) {
-                    Button {
-                        showLivePreview = true
-                    } label: {
-                        Label(LaraL10n.text(en: "Real preview", es: "Vista previa real"), systemImage: "eye.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-
-                    Button {
-                        manager.apply(selection: selection)
-                    } label: {
-                        Label(LaraL10n.text(en: "Apply combination", es: "Aplicar combinación"), systemImage: "wand.and.sparkles")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(cardPack.secondary.color)
-                    .controlSize(.large)
-                    .disabled(manager.isWorking || !mgr.sbxready)
+                Button {
+                    manager.apply(selection: selection)
+                } label: {
+                    Label(LaraL10n.text(en: "Apply combination", es: "Aplicar combinación"), systemImage: "wand.and.sparkles")
+                        .frame(maxWidth: .infinity)
                 }
-
-                Label(
-                    "Solo se guarda una acción para Deshacer. Los originales permanecen disponibles por separado.",
-                    systemImage: "checkmark.shield.fill"
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .buttonStyle(EagleApplyButtonStyle(fill: cardPack.secondary.color, text: .white,
+                                                   busy: manager.isWorking))
+                .disabled(manager.isWorking || !mgr.sbxready)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
-            .padding(.bottom, 40)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Crear combinación")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { manager.refreshCompatibility() }

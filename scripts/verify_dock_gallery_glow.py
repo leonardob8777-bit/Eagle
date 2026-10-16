@@ -54,7 +54,9 @@ swift = (ROOT / 'lara/views/new/DockGalleryView.swift').read_text()
 assert 'eagle_dock_gallery_glow_image(' in swift
 assert 'eagle_dock_gallery_glow_image(red, green, blue, outlineWidth, outlineHeight)' in source
 assert 'glowView, "alpha", galleryShadowOpacity' in source
-assert 'intensity: requestedIntensity' in swift
+flow = (ROOT / 'lara/EagleCore/DockGallery/EagleDockGalleryApplyFlow.swift').read_text()
+assert 'let requestedIntensity = intensity()' in flow and 'intensity: requestedIntensity' in flow
+assert 'intensity: { glowIntensity }' in swift
 assert 'outlineY = -3.0;' in source and 'outlineHeight = 102.333333;' in source
 print('PASS: preview/application share renderer and captured intensity; calibrated footprint retained')
 if not args.simulator:

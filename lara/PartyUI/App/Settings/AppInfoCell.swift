@@ -16,7 +16,10 @@ public struct AppInfoCell: View {
             VStack(alignment: .leading) {
                 Text(AppInfo.appName)
                     .font(.system(.title3, weight: .semibold))
-                Text("Version \(AppInfo.appVersion) (\(AppInfo.appBuild))")
+                Text(LaraL10n.text(
+                    en: "Version \(AppInfo.appVersion) (\(AppInfo.appBuild))",
+                    es: "Versión \(AppInfo.appVersion) (\(AppInfo.appBuild))"
+                ))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

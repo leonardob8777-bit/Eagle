@@ -101,17 +101,17 @@ struct IslandAuraView: View {
                 preview
                 controls
                 realityNote
-
-                if !mgr.dsready {
-                    LaraAccessView(compact: true)
-                }
-
-                applyButton
-                restoreButton
             }
             .padding(20)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        // Apply stays fixed at the bottom, in reach of the thumb; Prepare takes its place until ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            EagleApplyBar(ready: mgr.dsready) {
+                applyButton
+                restoreButton
+            }
+        }
+        .eagleScreenBackdrop()
         .navigationTitle("Island Aura")
         .navigationBarTitleDisplayMode(.inline)
         .eagleNotice(item: $notice, title: "Island Aura") { $0.message }
@@ -131,6 +131,7 @@ struct IslandAuraView: View {
                     .background(.regularMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
+                .transition(.eagleWorking)
             }
         }
         .onAppear {
@@ -281,7 +282,7 @@ struct IslandAuraView: View {
                                 radius: 6
                             )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(EaglePressableStyle(kind: .swatch))
                     .accessibilityLabel(preset.name)
                 }
                 Spacer()
@@ -339,7 +340,7 @@ struct IslandAuraView: View {
             .background(EagleVisualTheme.actionFill)
             .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EagleApplyButtonStyle(fill: nil))
         .disabled(isApplying)
     }
 

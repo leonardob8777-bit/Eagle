@@ -23,8 +23,8 @@ start = home.index('                        VStack(alignment: .leading, spacing:
 end = home.index('                                    NavigationLink(destination: AnimatedWallpapersView())', start)
 cards = home[start:end] + '\n}.buttonStyle(.plain).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))\n}\n}\n'
 welcome = (repo / 'lara/views/new/EagleBeta10WelcomeView.swift').read_text().split('#Preview')[0]
-language = (repo / 'lara/config/LaraLanguage.swift').read_text()
-theme = (repo / 'lara/views/new/EagleRainbowLoadingView.swift').read_text().split('struct EagleBrandMark:')[0]
+language = (repo / 'lara/EagleCore/Localization/EagleLocalization.swift').read_text() + '\n' + (repo / 'lara/config/LaraLanguage.swift').read_text()
+theme = (repo / 'lara/EagleAdapters/Appearance/EagleVisualTheme.swift').read_text() + '\n' + (repo / 'lara/views/new/EagleRainbowLoadingView.swift').read_text().split('struct EagleBrandMark:')[0]
 badge = (repo / 'lara/views/new/EagleNewBadge.swift').read_text()
 stub = r'''
 enum EagleSupportStatus { case possible, testedNeedsMoreTesting, supported, unsupported }

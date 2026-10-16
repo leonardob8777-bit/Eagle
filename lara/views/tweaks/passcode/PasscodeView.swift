@@ -318,7 +318,15 @@ struct PasscodeView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 4)
+                // On its own opaque card, like the rest of the screen, so the title and description read
+                // over the light top of the backdrop as well as over the dark.
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                }
 
                 NavigationLink {
                     PasscodeExploreView(mgr: mgr) { url in
@@ -363,12 +371,7 @@ struct PasscodeView: View {
                     Label("Importar archivo .passthm", systemImage: "square.and.arrow.down")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-
-                if !mgr.sbxready {
-                    LaraAccessView(compact: true)
-                }
+                .buttonStyle(EagleSecondaryButtonStyle())
 
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
@@ -449,6 +452,14 @@ struct PasscodeView: View {
                     PasscodeStatusBanner(message: statusMessage)
                 }
 
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .padding(.bottom, 24)
+        }
+        // Apply (and the restore menu) stay fixed at the bottom; Prepare takes their place until ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            EagleApplyBar(ready: mgr.sbxready) {
                 HStack(spacing: 12) {
                     Button {
                         applyTheme()
@@ -456,8 +467,7 @@ struct PasscodeView: View {
                         Text(LaraL10n.text(en: "Apply style", es: "Aplicar estilo"))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .buttonStyle(EagleApplyButtonStyle(busy: processing || passcodeThemeManager.isApplying))
                     .disabled(
                         selectedKeys.isEmpty ||
                         processing ||
@@ -496,13 +506,9 @@ struct PasscodeView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.large)
                 }
-                .padding(.top, 4)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-            .padding(.bottom, 24)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle(LaraL10n.text(en: "Passcode Style", es: "Estilo del código"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $showImagePicker) { keyId in

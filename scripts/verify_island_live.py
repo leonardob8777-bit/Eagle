@@ -16,6 +16,7 @@ args = parser.parse_args()
 repo = Path(__file__).resolve().parents[1]
 native = (repo / "lara/kexploit/pe/rc.m").read_text()
 media = (repo / "lara/views/new/IslandLiveMedia.swift").read_text()
+catalog_model = (repo / "lara/EagleCore/IslandGallery/EagleIslandGalleryCatalog.swift").read_text()
 
 
 def block(text, marker):
@@ -86,7 +87,7 @@ int main(void) {
     return 0;
 }
 '''
-swift_test = "import Foundation\n" + block(media, "nonisolated struct IslandLiveManifest:") + r'''
+swift_test = "import Foundation\n" + block(catalog_model, "nonisolated struct EagleIslandGalleryManifest:") + "\ntypealias IslandLiveManifest = EagleIslandGalleryManifest\n" + r'''
 let data = try Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1]))
 private let valid = try JSONDecoder().decode(IslandLiveManifest.self, from: data)
 assert(valid.isSupported)

@@ -21,9 +21,15 @@ app = work / "IslandGalleryPreview.app"
 app.mkdir()
 
 style = (repo / "lara/views/new/IslandGalleryView.swift").read_text().split("private final class IslandGalleryRemoteCallBox:")[0]
-model = (repo / "lara/views/new/IslandLiveMedia.swift").read_text().split("/// An isolated,")[0]
-media = (repo / "lara/views/new/LaraRemoteMediaPreview.swift").read_text()
-media = media.replace('        if !forceRefresh, loadedURL == url, case .loaded = state {', '''
+model = (repo / "lara/EagleCore/IslandGallery/EagleIslandGalleryCatalog.swift").read_text() + "\n" + (repo / "lara/EagleCore/IslandGallery/EagleIslandGalleryFilter.swift").read_text() + "\n" + (repo / "lara/views/new/IslandLiveMedia.swift").read_text().split("/// An isolated,")[0]
+loader = (repo / "lara/EagleAdapters/EagleRemoteMediaLoader.swift").read_text()
+model += "\n" + (repo / "lara/EagleCore/IslandGallery/EagleIslandGalleryFavorites.swift").read_text()
+model += "\n" + (repo / "lara/EagleCore/IslandGallery/EagleIslandGallerySelection.swift").read_text()
+model += "\n" + "\n".join((repo / f"lara/EagleCore/IslandGallery/EagleIslandGallery{name}.swift").read_text()
+                            for name in ("Collection", "Recovery", "LoadFlow", "ActionFlow"))
+load_guard = '        if !forceRefresh, loadedURL == url, case .loaded = state {'
+assert loader.count(load_guard) == 1, "The preview fixture must replace exactly one loader entry"
+loader = loader.replace(load_guard, '''
         let file = Bundle.main.bundleURL.appendingPathComponent("previews/" + url.lastPathComponent)
         if let data = try? Data(contentsOf: file) {
             loadedURL = url
@@ -31,9 +37,14 @@ media = media.replace('        if !forceRefresh, loadedURL == url, case .loaded 
             return
         }
         if !forceRefresh, loadedURL == url, case .loaded = state {''')
+media = "\n".join((
+    loader,
+    (repo / "lara/EagleAdapters/EagleRemoteMediaPreview.swift").read_text(),
+    (repo / "lara/views/new/LaraRemoteMediaPreview.swift").read_text(),
+))
 presentation = (repo / "lara/views/new/IslandGalleryPresentation.swift").read_text()
 motion = (repo / "lara/views/new/EagleGalleryMotion.swift").read_text()
-position = (repo / "lara/views/new/GalleryPositionControl.swift").read_text()
+position = (repo / "lara/EagleCore/Gallery/EagleGalleryPosition.swift").read_text() + "\n" + (repo / "lara/EagleAdapters/Gallery/EagleGalleryPositionStorage.swift").read_text() + "\n" + (repo / "lara/views/new/GalleryPositionControl.swift").read_text()
 shell = (repo / "lara/views/new/EagleAppShellView.swift").read_text().split("private struct TelegramSafariView:")[0]
 # QA-only scroll position; the production view and native controls stay unchanged.
 presentation = presentation.replace("collectionSection(proxy: proxy)", 'collectionSection(proxy: proxy).id("qa-collection")', 1)
@@ -45,7 +56,7 @@ presentation = presentation.replace(".scrollIndicators(.hidden)", '''.scrollIndi
                     }
                 }
             }''', 1)
-language = (repo / "lara/config/LaraLanguage.swift").read_text()
+language = (repo / "lara/EagleCore/Localization/EagleLocalization.swift").read_text() + "\n" + (repo / "lara/config/LaraLanguage.swift").read_text()
 stub = r'''
 nonisolated enum IslandLiveMedia {
     static let previewURL = URL(string: "https://example.test/singularity-live.gif")!

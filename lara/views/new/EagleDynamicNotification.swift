@@ -15,11 +15,12 @@ enum EagleNoticeKind: Sendable {
         }
     }
 
+    /// Accent for the title and symbols, as in the reference (#2F9BFF), with system green and red for results.
     var color: Color {
         switch self {
-        case .success: return Color(red: 0.33, green: 0.88, blue: 0.58)
-        case .error: return Color(red: 1, green: 0.38, blue: 0.39)
-        case .information: return Color(red: 0.43, green: 0.71, blue: 1)
+        case .success: return Color(red: 0.204, green: 0.78, blue: 0.349)
+        case .error: return Color(red: 1, green: 0.231, blue: 0.188)
+        case .information: return Color(red: 0.184, green: 0.608, blue: 1)
         }
     }
 }
@@ -32,6 +33,8 @@ struct EagleDynamicNotice: Identifiable {
     let actionTitle: String?
     let action: (() -> Void)?
     var immediate = false
+    /// The card takes the colour opposite to the app: white over a dark app, black over a light one.
+    var lightCard = true
 
     var sourceSymbol: String {
         let source = title.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
@@ -49,7 +52,7 @@ struct EagleDynamicNotice: Identifiable {
 }
 
 /// One visible notification and one cancellable expiry. No polling, network,
-/// background work or permanent animation. Only the card intercepts touches.
+/// background work or permanent animation. Purely visual: it never intercepts touches.
 @MainActor
 final class EagleNotifications: ObservableObject {
     static let shared = EagleNotifications()
@@ -62,6 +65,8 @@ final class EagleNotifications: ObservableObject {
     private var presentation: Task<Void, Never>?
     private var pending: EagleDynamicNotice?
     private var observers: [NSObjectProtocol] = []
+    /// Length of the exit choreography in EagleNoticeCard, plus a frame of margin.
+    static let exitDuration: UInt64 = 780_000_000
 
     private init() {
         observers.append(NotificationCenter.default.addObserver(
@@ -144,12 +149,15 @@ final class EagleNotifications: ObservableObject {
             let controller = UIHostingController(rootView: EagleNoticeOverlay(center: self))
             controller.view.backgroundColor = .clear
             overlay.rootViewController = controller
+            EagleStatusBar.adopt(controller, from: scene)
             window = overlay
         }
+        incoming.lightCard = appIsDark(scene)
         current = incoming
         visible = true
         window?.isHidden = false // deliberately never becomes key window
-        let lifetime: UInt64 = UIAccessibility.isVoiceOverRunning ? 12 : (incoming.action != nil ? 9 : (incoming.kind == .error ? 7 : 4))
+        // Purely visual: actions are not offered from the notice, so no longer lifetime for them.
+        let lifetime: UInt64 = UIAccessibility.isVoiceOverRunning ? 12 : (incoming.kind == .error ? 7 : 4)
         expiry = Task { [weak self] in
             do { try await Task.sleep(nanoseconds: (lifetime * 1_000_000_000) + (incoming.immediate ? 0 : 560_000_000)) }
             catch { return }
@@ -160,6 +168,13 @@ final class EagleNotifications: ObservableObject {
 
     func hold() { expiry?.cancel(); expiry = nil }
 
+    /// Reads the appearance the app is actually showing (dark, light or following the system).
+    private func appIsDark(_ scene: UIWindowScene) -> Bool {
+        let app = scene.windows.first { !($0 is EagleNoticeWindow) && $0.isKeyWindow }
+            ?? scene.windows.first { !($0 is EagleNoticeWindow) }
+        return (app?.traitCollection.userInterfaceStyle ?? .dark) != .light
+    }
+
     func dismiss() {
         beginExit()
     }
@@ -168,17 +183,15 @@ final class EagleNotifications: ObservableObject {
         hold()
         guard let id = current?.id, visible else { return }
         visible = false
-        window?.hitRegion = .zero
         retirement?.cancel()
         retirement = Task { [weak self] in
-            do { try await Task.sleep(nanoseconds: 650_000_000) }
+            // Keep the overlay until the exit has fully played (the drop back inside the island).
+            do { try await Task.sleep(nanoseconds: Self.exitDuration) }
             catch { return }
             guard let self, self.current?.id == id else { return }
             self.clear()
         }
     }
-
-    func setHitRegion(_ rect: CGRect) { window?.hitRegion = visible ? rect : .zero }
 
     private func clear() {
         presentation?.cancel(); presentation = nil
@@ -193,12 +206,9 @@ final class EagleNotifications: ObservableObject {
     }
 }
 
+/// The notice is purely visual: its window never takes a touch, so taps reach the app underneath.
 private final class EagleNoticeWindow: UIWindow {
-    var hitRegion = CGRect.zero
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard hitRegion.contains(point) else { return nil }
-        return super.hitTest(point, with: event)
-    }
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
 }
 
 struct EagleNotificationInstaller: UIViewRepresentable {
@@ -244,8 +254,22 @@ private struct EagleNoticeCard: View {
     @State private var reveal: CGFloat = 0
     @State private var tint: CGFloat = 0
     @State private var dragY: CGFloat = 0
+    @State private var shown = false
     @ScaledMetric(relativeTo: .subheadline) private var titleSize: CGFloat = 17
     @ScaledMetric(relativeTo: .footnote) private var messageSize: CGFloat = 14
+
+    /// Entrance: a quick spring per part, offset by `delay`. Exit: all parts fade together, fast.
+    private func entry(_ delay: Double) -> Animation {
+        shown ? .spring(response: 0.42, dampingFraction: 0.82).delay(delay) : .easeOut(duration: 0.14)
+    }
+
+    private func announceHaptic() {
+        switch notice.kind {
+        case .success: UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case .error: UINotificationFeedbackGenerator().notificationOccurred(.error)
+        case .information: UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+    }
 
     private var resolvedLayout: EagleNotificationLayout {
         // Normal type uses the reference's exact 74-point card. Larger type
@@ -257,109 +281,129 @@ private struct EagleNoticeCard: View {
     var body: some View {
         let l = resolvedLayout
         EagleNotificationMorph(layout: l, drop: drop, expand: expand,
-                               reveal: reveal, tint: tint, dragY: dragY) {
+                               reveal: reveal, tint: tint, dragY: dragY,
+                               cardTone: notice.lightCard ? 1 : 0) {
+            // Reference body (notification-body.tsx): 46 pt avatar disc, accent title, grey message,
+            // 27 pt accent symbol, on the card the island's drop turns into. Its parts arrive in a
+            // short cascade and leave together.
+            let light = notice.lightCard
             HStack(spacing: 12) {
                 Image(systemName: notice.sourceSymbol)
-                    .font(.system(size: 22, weight: .semibold))
+                    // Same symbol design in every language (textformat is redrawn per language).
+                    .environment(\.locale, Locale(identifier: "en"))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(notice.kind.color)
                     .frame(width: 46, height: 46)
-                    .background(notice.kind.color.opacity(0.16), in: Circle())
+                    .background(light ? Color(red: 0.91, green: 0.914, blue: 0.922) : Color(white: 0.17),
+                                in: Circle())
+                    .scaleEffect(shown ? 1 : 0.6)
+                    .opacity(shown ? 1 : 0)
+                    .animation(entry(0), value: shown)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(notice.title)
                         .font(.system(size: titleSize, weight: .bold))
                         .tracking(-0.35)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(notice.kind.color)
                         .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
+                        .offset(y: shown ? 0 : 5)
+                        .opacity(shown ? 1 : 0)
+                        .animation(entry(0.05), value: shown)
                     Text(notice.message)
                         .font(.system(size: messageSize, weight: .medium))
                         .tracking(-0.2)
-                        .foregroundStyle(.white.opacity(0.78))
+                        .foregroundStyle(light ? Color(red: 0.467, green: 0.471, blue: 0.49) : Color(white: 0.64))
                         .lineLimit(typeSize.isAccessibilitySize ? 3 : 2)
+                        .offset(y: shown ? 0 : 5)
+                        .opacity(shown ? 1 : 0)
+                        .animation(entry(0.1), value: shown)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: notice.kind.symbol)
-                    .font(.system(size: 23, weight: .semibold))
-                    .foregroundStyle(notice.kind.color)
+                EagleNoticeResultSymbol(symbol: notice.kind.symbol, color: notice.kind.color, shown: shown)
+                    .scaleEffect(shown ? 1 : 0.4)
+                    .opacity(shown ? 1 : 0)
+                    .animation(shown ? .spring(response: 0.45, dampingFraction: 0.58).delay(0.15)
+                                     : .easeOut(duration: 0.14), value: shown)
                     .accessibilityHidden(true)
             }
             .padding(.leading, 13).padding(.trailing, 20)
             .frame(width: l.cardWidth, height: l.cardHeight)
-            .background(Color(red: 0.075, green: 0.084, blue: 0.105), in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(notice.kind.color.opacity(0.38), lineWidth: 1)
-            }
-            .contentShape(Capsule())
-            .onTapGesture {
-                center.dismiss()
-                notice.action?()
-            }
-            .gesture(DragGesture(minimumDistance: 8)
-                .onChanged { value in
-                    dragY = min(24, max(-120, value.translation.height))
-                }
-                .onEnded { value in
-                    if value.translation.height < -18 ||
-                        value.predictedEndTranslation.height - value.translation.height < -42 {
-                        center.dismiss()
-                    } else {
-                        withAnimation(EagleReferenceSpring.animation(milliseconds: 560, dampingRatio: 0.7)) {
-                            dragY = 0
-                        }
-                    }
-                })
+            .background(light ? Color.white : Color.black, in: Capsule())
+            .environment(\.colorScheme, light ? .light : .dark)
+            .allowsHitTesting(false)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(notice.title + ". " + notice.message)
-            .accessibilityHint(notice.actionTitle ?? LaraL10n.text(en: "Tap to dismiss", es: "Toca para cerrar"))
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { center.dismiss(); notice.action?() }
         }
         .frame(width: l.width, height: l.canvasHeight, alignment: .topLeading)
         .task(id: visible) {
             if reduceMotion || (visible && notice.immediate) {
+                if visible { announceHaptic() }
+                shown = visible
                 drop = visible ? 1 : 0
                 expand = visible ? 1 : 0
                 reveal = visible ? 1 : 0
                 tint = visible ? 1 : 0
-                center.setHitRegion(visible ? l.cardRect : .zero)
                 return
             }
             if visible {
-                // Source timings: tint 110ms, expansion 340ms, reveal 560ms.
-                withAnimation(EagleReferenceSpring.animation(milliseconds: 1_150, dampingRatio: 0.82)) {
+                announceHaptic()
+                // Faster than the reference (drop 1150 ms, tint +110, expand +340, reveal +560): the drop
+                // leaves the island with a bulge, stretches into the card with a small width "pop",
+                // and the body cascades in as soon as the card has its shape.
+                withAnimation(EagleReferenceSpring.animation(milliseconds: 900, dampingRatio: 0.8)) {
                     drop = 1
                 }
-                do { try await Task.sleep(nanoseconds: 110_000_000) } catch { return }
-                withAnimation(EagleReferenceSpring.animation(milliseconds: 700, dampingRatio: 1)) {
+                do { try await Task.sleep(nanoseconds: 80_000_000) } catch { return }
+                withAnimation(EagleReferenceSpring.animation(milliseconds: 520, dampingRatio: 1)) {
                     tint = 1
                 }
-                do { try await Task.sleep(nanoseconds: 230_000_000) } catch { return }
-                withAnimation(EagleReferenceSpring.animation(milliseconds: 1_000, dampingRatio: 0.8)) {
+                do { try await Task.sleep(nanoseconds: 180_000_000) } catch { return }
+                withAnimation(EagleReferenceSpring.animation(milliseconds: 780, dampingRatio: 0.72)) {
                     expand = 1
                 }
-                do { try await Task.sleep(nanoseconds: 220_000_000) } catch { return }
-                withAnimation(EagleReferenceSpring.animation(milliseconds: 700, dampingRatio: 1)) {
+                do { try await Task.sleep(nanoseconds: 150_000_000) } catch { return }
+                withAnimation(EagleReferenceSpring.animation(milliseconds: 480, dampingRatio: 1)) {
                     reveal = 1
                 }
-                center.setHitRegion(l.cardRect)
+                shown = true
                 UIAccessibility.post(notification: .announcement,
                                      argument: notice.title + ". " + notice.message)
             } else {
-                // Fade, collapse to a droplet, then pull it back into the island.
-                withAnimation(EagleReferenceSpring.animation(milliseconds: 360, dampingRatio: 1)) {
+                // The body leaves first, the card folds into a drop, then the island draws it back in,
+                // accelerating, and swells as it swallows it. ~0.75 s (EagleNotifications.exitDuration).
+                shown = false
+                do { try await Task.sleep(nanoseconds: 70_000_000) } catch { return }
+                withAnimation(EagleReferenceSpring.animation(milliseconds: 240, dampingRatio: 1)) {
                     reveal = 0
                 }
-                do { try await Task.sleep(nanoseconds: 100_000_000) } catch { return }
-                withAnimation(EagleReferenceSpring.animation(milliseconds: 660, dampingRatio: 0.92)) {
+                do { try await Task.sleep(nanoseconds: 50_000_000) } catch { return }
+                withAnimation(EagleReferenceSpring.animation(milliseconds: 460, dampingRatio: 0.9)) {
                     expand = 0
                 }
-                do { try await Task.sleep(nanoseconds: 180_000_000) } catch { return }
-                withAnimation(EagleReferenceSpring.animation(milliseconds: 1_150, dampingRatio: 0.9)) {
+                do { try await Task.sleep(nanoseconds: 110_000_000) } catch { return }
+                withAnimation(.timingCurve(0.55, 0, 0.85, 0.45, duration: 0.5)) {
                     drop = 0; tint = 0; dragY = 0
                 }
             }
         }
-        .onChange(of: l.cardRect) { center.setHitRegion($0) }
+    }
+}
+
+/// The result glyph; on iOS 17 and later it bounces once as it lands.
+private struct EagleNoticeResultSymbol: View {
+    let symbol: String
+    let color: Color
+    let shown: Bool
+
+    var body: some View {
+        let image = Image(systemName: symbol)
+            .font(.system(size: 27, weight: .semibold))
+            .foregroundStyle(color)
+        if #available(iOS 17.0, *) {
+            image.symbolEffect(.bounce, value: shown)
+        } else {
+            image
+        }
     }
 }
 

@@ -19,9 +19,10 @@ struct LaraCustomApp: App {
     @AppStorage(LaraLanguage.storageKey) private var language = LaraLanguage.english
     @AppStorage(EagleAppearanceMode.storageKey)
     private var appearanceModeRaw = EagleAppearanceMode.dark.rawValue
-    @AppStorage("eagle.updates.visualPolish105.build92.completed")
-    private var hasSeenStableUpdate = false
-    @State private var showingStableUpdate = false
+    // The welcome is shown once per installation of Eagle, including an IPA installed over an existing copy.
+    @State private var showingStableUpdate = EagleWelcomeInstall.needsWelcome
+    // Every other launch opens with the logo from the launch screen growing into the app.
+    @State private var showingLaunchSplash = !EagleWelcomeInstall.needsWelcome
 
     private var preferredColorScheme: ColorScheme? {
         (EagleAppearanceMode(rawValue: appearanceModeRaw) ?? .dark).preferredColorScheme
@@ -29,6 +30,10 @@ struct LaraCustomApp: App {
     
     init() {
         EaglePreferenceMigration.runIfNeeded()
+        // Simplified Chinese interface text (the table lives outside the core module).
+        EagleLocalization.chineseText = EagleChineseText.translate
+        // The screens are in place from the first frame: the opening (or the welcome) reveals them.
+        EagleArrival.shared.arrive()
         EagleSpectrumStyle.configureGlobalNavigationAppearance()
 
         #if DEBUG
@@ -53,7 +58,13 @@ struct LaraCustomApp: App {
             .background(EagleNotificationInstaller().frame(width: 0, height: 0))
             .environmentObject(mgr)
             .environment(\.locale, language.locale)
+            // Every switch in the app keeps its knob visible (see EagleSwitchToggleStyle).
+            .toggleStyle(EagleSwitchToggleStyle())
             .preferredColorScheme(preferredColorScheme)
+            // Choosing Light, Dark or System in Settings crossfades the window instead of flipping.
+            .onChange(of: appearanceModeRaw) { _ in EagleThemeCrossfade.run() }
+            // Switching the language crossfades the texts the same way.
+            .onChange(of: language) { _ in EagleThemeCrossfade.run() }
             .overlay {
                 if mgr.showrespring {
                     respringview()
@@ -62,25 +73,49 @@ struct LaraCustomApp: App {
                 }
             }
             .onAppear {
-                if !hasSeenStableUpdate {
-                    showingStableUpdate = true
-                }
                 if !isunsupported() {
                     init_offsets()
                     offsets_init()
                     mgr.hasOffsets = emergencyfixfunctiontobereplacedlateronquestionmark()
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                    EagleSceneManager.shared.applyPendingShortcutIfNeeded()
+                    if !showingStableUpdate {
+                        EagleSceneManager.shared.applyPendingShortcutIfNeeded()
+                    }
                 }
             }
             .onChange(of: scenephase, perform: handleScenePhase)
-            .sheet(isPresented: $showingStableUpdate) {
-                EagleBeta10WelcomeView {
-                    hasSeenStableUpdate = true
-                    showingStableUpdate = false
+            .allowsHitTesting(!showingStableUpdate && !showingLaunchSplash)
+            .accessibilityHidden(showingStableUpdate || showingLaunchSplash)
+            // No zoom while the welcome closes: the welcome clears onto the app's own backdrop, so only
+            // the app's content appears. (A scaled app also lays its backdrop out below the top safe area
+            // until it is back at full size, which showed as a band and a jump at the end.)
+            .overlay {
+                if showingStableUpdate {
+                    EagleBeta10WelcomeView(onContinue: {
+                        EagleWelcomeInstall.markSeen()
+                        showingStableUpdate = false
+                        EagleArrival.shared.arrive()
+                        EagleSceneManager.shared.applyPendingShortcutIfNeeded()
+                    }, onReveal: {
+                        // The app's content lands on the backdrop as the welcome clears.
+                        EagleArrival.shared.arrive()
+                    })
+                    .environment(\.locale, language.locale)
+                    .ignoresSafeArea()
+                    .zIndex(100)
                 }
             }
+            .overlay {
+                if showingLaunchSplash {
+                    EagleLaunchSplash { showingLaunchSplash = false }
+                        .zIndex(101)
+                }
+            }
+            // One owner: leaving either opening restores the bar on every app route.
+            .statusBarHidden(showingStableUpdate || showingLaunchSplash)
+            .onChange(of: showingStableUpdate) { _ in EagleStatusBar.refresh() }
+            .onChange(of: showingLaunchSplash) { _ in EagleStatusBar.refresh() }
         }
     }
     
@@ -101,7 +136,9 @@ struct LaraCustomApp: App {
             globallogger.capture()
             mgr.remoteAppDidBecomeActive()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                EagleSceneManager.shared.applyPendingShortcutIfNeeded()
+                if !showingStableUpdate {
+                    EagleSceneManager.shared.applyPendingShortcutIfNeeded()
+                }
             }
 
         @unknown default:

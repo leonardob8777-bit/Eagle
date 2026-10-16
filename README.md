@@ -1,5 +1,8 @@
 <div align="center">
-  <img src="lara/other/media.xcassets/AppIcon.appiconset/Eagle-Light.png" alt="Eagle app icon" width="152" height="152">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="lara/other/media.xcassets/AppIcon.appiconset/Eagle-Dark.png">
+    <img src="lara/other/media.xcassets/AppIcon.appiconset/Eagle-Light.png" alt="Eagle app icon" width="152" height="152">
+  </picture>
 
   # Eagle
 
@@ -16,17 +19,17 @@
 
   <br>
 
-  <a href="https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.5/Eagle-1.0.5-92.ipa">
-    <img src="https://img.shields.io/badge/DOWNLOAD_EAGLE.IPA-VERSION_1.0.5-171717?style=for-the-badge&logo=apple&logoColor=white" alt="Download Eagle 1.0.5 IPA" height="48">
+  <a href="https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.6/Eagle-1.0.6-95.ipa">
+    <img src="https://img.shields.io/badge/DOWNLOAD_EAGLE.IPA-VERSION_1.0.6-171717?style=for-the-badge&logo=apple&logoColor=white" alt="Download Eagle 1.0.6 IPA" height="48">
   </a>
 
   <br><br>
 
-  [Release notes](https://github.com/leonardob8777-bit/Eagle/releases/tag/v1.0.5)
+  [Release notes](https://github.com/leonardob8777-bit/Eagle/releases/tag/v1.0.6)
   · [Report a bug](https://github.com/leonardob8777-bit/Eagle/issues/new?template=bug_report.md)
   · [Request a feature](https://github.com/leonardob8777-bit/Eagle/issues/new?template=feature_request.md)
 
-  <sub>The release IPA is unsigned. Sign it with your usual personal-device installation method.</sub>
+  <sub>Sign the IPA with your usual personal-device installation method.</sub>
 </div>
 
 ---
@@ -35,7 +38,8 @@
 
 | | |
 |---|---|
-| **Current release** | Eagle 1.0.5 · build 92 |
+| **Current release** | Eagle 1.0.6 · build 95 |
+| **Languages** | English · Español · 简体中文 |
 | **Primarily verified on** | iPhone 16 Pro (`iPhone17,1`) · iOS 18.6.2 (`22G100`) |
 | **Architecture** | `arm64e` |
 | **Verified Aura surfaces** | Dynamic Island, Dock and current-page icon glow/outline · isolated apply and verification |
@@ -62,15 +66,16 @@
 | 🔤 **App Name Color · Advanced** | Applies a page-owned solid color to app names on the current Home Screen page. |
 | 🛡️ **Eagle System** | Adds Guardian checks, Scenes and shareable personalization recipes. |
 
-### New in Eagle 1.0.5
+### New in Eagle 1.0.6
 
-- Refreshed Island and Dock Galleries with clearer Live/Static/Saves navigation, focused preview animations, safer media lifetimes and precise quarter-point position controls.
-- Added position controls to Aura Studio without changing its existing apply engine.
-- Added native translucent Access/Customize navigation and Eagle result notifications that do not shift the app content.
-- Prepare keeps its animated rainbow progress, uses a readable green action and transitions smoothly to Ready.
-- Separated general Settings from Laboratory Tools and updated the first-launch Updates window.
-- Corrected white-on-white action text in Cards and related controls; removed three unsuitable Dock-derived styles from Island Gallery while leaving them in Dock.
-- Retained ownership checks and recovery paths for theme, Aura and Hide Dock operations. Apply and Prepare still require compatible devices and should be tested one change at a time.
+- **简体中文:** Simplified Chinese joins English and Spanish, with language changes applied immediately.
+- **A new opening:** monochrome Eagle icon, animated logo launch and a circular transition from the welcome screen.
+- **Actions within reach:** fixed bottom Prepare/Apply bars across customization screens; previews and saving stay in the page.
+- **31 new Dock backgrounds:** 18 Static and 13 Live additions to the online gallery.
+- **Clearer controls:** readable text over gradients, solid secondary buttons, legible disabled labels and switches that remain visible and unclipped in light and dark mode.
+- **Smoother feedback:** refined tab transitions, touch feedback and Prepare progress, with hidden background animations paused.
+
+Read the [complete release notes](docs/releases/v1.0.6.md), including verification and known visual limitations. This update does not expand iOS compatibility.
 
 ### Aura Studio safety model
 
@@ -88,7 +93,7 @@
 ## Install Eagle
 
 1. Use the large **Download Eagle.ipa** button at the top of this page.
-2. Sign the unsigned IPA with your preferred personal-device sideloading method.
+2. Sign the IPA with your preferred personal-device sideloading method.
 3. Install it and open Eagle manually from the Home Screen.
 4. If you installed through Xcode, press **Stop** before preparing Eagle access.
 5. Apply one feature at a time and keep the exact result message if something fails.

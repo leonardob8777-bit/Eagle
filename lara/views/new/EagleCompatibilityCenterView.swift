@@ -45,7 +45,16 @@ struct EagleCompatibilityCenterView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } header: {
+                // The first header sits on the light top of the backdrop: on a small opaque pill, like
+                // Eagle's other labels, so it reads there too.
                 Text(LaraL10n.text(en: "This iPhone", es: "Este iPhone"))
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+                    .padding(.leading, -6)
             }
 
             Section {
@@ -140,6 +149,7 @@ struct EagleCompatibilityCenterView: View {
                 ))
             }
         }
+        .eagleScreenBackdrop()
         .navigationTitle(LaraL10n.text(en: "Compatibility", es: "Compatibilidad"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingLogs) {

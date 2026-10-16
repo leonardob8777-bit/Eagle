@@ -1406,6 +1406,8 @@ struct IconThemeFixupView: View {
                     manager.dismissFixupSheet()
                 }
                 .buttonStyle(.borderedProminent)
+                // The contrasting colour on the black/white fill, grey while disabled.
+                .eagleProminentLabel()
                 .disabled(manager.isFixingUp)
                 .padding(.bottom)
             }

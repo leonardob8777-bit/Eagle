@@ -27,32 +27,14 @@ struct IslandGalleryArtwork: Identifiable {
     var motionURL: URL? { isRemote ? (liveTheme?.previewURL ?? IslandLiveMedia.previewURL) : nil }
 }
 
-enum IslandGalleryFilter: String, CaseIterable, Identifiable {
-    case all, live, still, favorites
-    var id: String { rawValue }
+typealias IslandGalleryFilter = EagleIslandGalleryFilter
+
+extension EagleIslandGalleryFilter {
     var title: String {
-        switch self {
-        case .all: return LaraL10n.text(en: "All", es: "Todo")
-        case .live: return "Live"
-        case .still: return "Static"
-        case .favorites: return "Saves"
-        }
-    }
-    var icon: String {
-        switch self {
-        case .all: return "square.grid.2x2"
-        case .live: return "play.circle"
-        case .still: return "sparkles"
-        case .favorites: return "heart"
-        }
+        title(localizedText: { LaraL10n.text(en: $0, es: $1) })
     }
     func includes(_ artwork: IslandGalleryArtwork, favorites: Set<String>) -> Bool {
-        switch self {
-        case .all: return true
-        case .live: return artwork.isLive
-        case .still: return !artwork.isLive
-        case .favorites: return favorites.contains(artwork.id)
-        }
+        includes(isLive: artwork.isLive, artworkID: artwork.id, favorites: favorites)
     }
 }
 
@@ -80,26 +62,30 @@ struct IslandGalleryView: View {
     @State private var rememberedSelections: [IslandGalleryFilter: String] = [:]
 
     private var artworks: [IslandGalleryArtwork] {
-        IslandGalleryStyle.allCases.filter(\.isAvailableInGallery).map { style in
-            IslandGalleryArtwork(style: style, liveTheme: style == .singularityLive
-                ? liveThemes.first(where: { $0.id == "singularity-live" }) : nil)
-        } + liveThemes.filter { $0.id != "singularity-live" }.map { IslandGalleryArtwork(style: .singularityLive, liveTheme: $0) }
+        EagleIslandGalleryCollection.assemble(
+            styles: { IslandGalleryStyle.allCases },
+            isAvailable: { $0.isAvailableInGallery },
+            remoteStyle: IslandGalleryStyle.singularityLive,
+            themes: { liveThemes },
+            makeArtwork: { IslandGalleryArtwork(style: $0, liveTheme: $1) }
+        )
     }
     private var favorites: Set<String> {
-        guard let data = favoritesJSON.data(using: .utf8),
-              let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
-        return Set(ids)
+        EagleIslandGalleryFavorites.decode(favoritesJSON)
     }
     private var visibleArtworks: [IslandGalleryArtwork] {
-        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        return artworks.filter { item in
-            filter.includes(item, favorites: favorites) &&
-                (query.isEmpty || item.title.localizedStandardContains(query) ||
-                 item.subtitle.localizedStandardContains(query) || item.id.localizedStandardContains(query))
-        }
+        EagleIslandGalleryCollection.visible(
+            search: { search },
+            artworks: { artworks },
+            filter: { filter },
+            favorites: { favorites },
+            isLive: { $0.isLive },
+            title: { $0.title },
+            subtitle: { $0.subtitle }
+        )
     }
     private var selected: IslandGalleryArtwork? {
-        visibleArtworks.first(where: { $0.id == selectedID }) ?? visibleArtworks.first
+        selectionController.selected
     }
     private var activeArtwork: IslandGalleryArtwork? {
         artworks.first(where: isActive)
@@ -113,7 +99,23 @@ struct IslandGalleryView: View {
             (!item.isRemote || activeLiveID == item.id)
     }
     private var selectionIndex: Int {
-        visibleArtworks.firstIndex(where: { $0.id == selected?.id }) ?? 0
+        selectionController.selectionIndex
+    }
+
+    private var selectionController: EagleIslandGallerySelection<IslandGalleryArtwork> {
+        EagleIslandGallerySelection(
+            readVisibleArtworks: { self.visibleArtworks },
+            readApplying: { self.applying },
+            readSelectedID: { self.selectedID },
+            writeSelectedID: { self.selectedID = $0 },
+            writeSelectedRaw: { self.selectedRaw = $0 },
+            readFilter: { self.filter },
+            writeFilter: { self.filter = $0 },
+            readMemory: { self.rememberedSelections },
+            writeMemory: { self.rememberedSelections = $0 },
+            rawStyle: { $0.style.rawValue },
+            feedback: { UISelectionFeedbackGenerator().selectionChanged() }
+        )
     }
 
     var body: some View {
@@ -150,11 +152,9 @@ struct IslandGalleryView: View {
             .scrollDismissesKeyboard(.interactively)
             actionBar
             }
-            .background(Color(uiColor: .systemBackground))
+            .eagleScreenBackdrop()
             .navigationTitle("Island Gallery")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { Task { await loadCatalog(force: true) } } label: {
@@ -212,7 +212,7 @@ struct IslandGalleryView: View {
                             .frame(width: 44, height: 44)
                             .background(Color.primary.opacity(0.05), in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(EaglePressableStyle(kind: .swatch))
                     .disabled(reduceMotion)
                     .accessibilityLabel(motionPaused
                         ? LaraL10n.text(en: "Play preview", es: "Reproducir vista previa")
@@ -270,7 +270,7 @@ struct IslandGalleryView: View {
                 .frame(width: 44, height: 44)
                 .background(Color.primary.opacity(0.06), in: Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle())
         .disabled(applying || visibleArtworks.count < 2)
         .accessibilityLabel(direction < 0
             ? LaraL10n.text(en: "Previous style", es: "Estilo anterior")
@@ -357,7 +357,7 @@ struct IslandGalleryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 19))
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(EaglePressableStyle())
             .accessibilityLabel(LaraL10n.text(en: "Preview \(item.title)", es: "Ver \(item.title)"))
             .disabled(applying)
             HStack(spacing: 2) {
@@ -369,15 +369,16 @@ struct IslandGalleryView: View {
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(EaglePressableStyle(kind: .card))
                 .disabled(applying)
                 Button { toggleFavorite(item) } label: {
                     Image(systemName: favorites.contains(item.id) ? "heart.fill" : "heart")
                         .font(.system(size: 12))
                         .foregroundStyle(favorites.contains(item.id) ? .pink : .secondary)
+                        .eagleSymbolPop(favorites.contains(item.id))
                         .frame(width: 34, height: 44)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(EaglePressableStyle(kind: .swatch))
                 .disabled(applying)
                 .accessibilityLabel(favoriteLabel(item))
             }
@@ -389,6 +390,7 @@ struct IslandGalleryView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 19)
                 .strokeBorder(isSelected ? item.accent.opacity(0.9) : Color.primary.opacity(0.065), lineWidth: isSelected ? 1.5 : 1)
+                .animation(.easeInOut(duration: 0.22), value: isSelected)
         }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -412,7 +414,8 @@ struct IslandGalleryView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 48)
         .padding(.horizontal, 18)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 24))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1) }
     }
 
     private var catalogRetry: some View {
@@ -445,7 +448,8 @@ struct IslandGalleryView: View {
             .accessibilityLabel(LaraL10n.text(en: "Restore original Island", es: "Restaurar Island original"))
         }
         .padding(14)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1) }
     }
 
     private var retiredStyleRestoration: some View {
@@ -469,7 +473,8 @@ struct IslandGalleryView: View {
             ))
         }
         .padding(14)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1) }
     }
 
     @ViewBuilder private var actionBar: some View {
@@ -499,8 +504,7 @@ struct IslandGalleryView: View {
                     .padding(.vertical, 10)
                     .foregroundStyle(EagleVisualTheme.actionText)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(EagleVisualTheme.actionFill)
+                .buttonStyle(EagleApplyButtonStyle(busy: applying))
                 .accessibilityIdentifier("island-apply")
 
                 if isActive(item) && manager.dsready {
@@ -516,11 +520,7 @@ struct IslandGalleryView: View {
                 }
             }
             .disabled(applying)
-            .padding(.horizontal, 20)
-            .padding(.top, 13)
-            .padding(.bottom, 12)
-            .background(Color(uiColor: .systemBackground))
-            .overlay(alignment: .top) { Rectangle().fill(Color.primary.opacity(0.07)).frame(height: 0.5) }
+            .eagleActionBar()
         }
     }
 
@@ -544,10 +544,11 @@ struct IslandGalleryView: View {
             Image(systemName: favorites.contains(item.id) ? "heart.fill" : "heart")
                 .font(.system(size: 16))
                 .foregroundStyle(favorites.contains(item.id) ? Color.pink : .primary)
+                .eagleSymbolPop(favorites.contains(item.id))
                 .frame(width: 44, height: 44)
                 .background(Color.primary.opacity(0.05), in: Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle(kind: .swatch))
         .disabled(applying)
         .accessibilityLabel(favoriteLabel(item))
         .accessibilityIdentifier("island-favorite")
@@ -560,21 +561,17 @@ struct IslandGalleryView: View {
     }
 
     private func toggleFavorite(_ item: IslandGalleryArtwork) {
-        guard !applying else { return }
-        var ids = favorites
-        if !ids.insert(item.id).inserted { ids.remove(item.id) }
-        if let data = try? JSONEncoder().encode(ids.sorted()), let json = String(data: data, encoding: .utf8) {
-            favoritesJSON = json
-        }
-        UISelectionFeedbackGenerator().selectionChanged()
+        EagleIslandGalleryFavorites.toggle(
+            applying: { applying },
+            favorites: { favorites },
+            artworkID: { item.id },
+            save: { favoritesJSON = $0 },
+            feedback: { UISelectionFeedbackGenerator().selectionChanged() }
+        )
     }
 
     private func select(_ item: IslandGalleryArtwork) {
-        guard !applying else { return }
-        selectedID = item.id
-        selectedRaw = item.style.rawValue
-        rememberedSelections[filter] = item.id
-        UISelectionFeedbackGenerator().selectionChanged()
+        selectionController.select(item)
     }
 
     private func selectForPreview(_ item: IslandGalleryArtwork) {
@@ -582,47 +579,33 @@ struct IslandGalleryView: View {
     }
 
     private func selectFilter(_ value: IslandGalleryFilter) {
-        guard !applying else { return }
-        if let selected { rememberedSelections[filter] = selected.id }
-        filter = value
-        if let remembered = rememberedSelections[value], visibleArtworks.contains(where: { $0.id == remembered }) {
-            selectedID = remembered
-        }
-        synchronizeSelection()
-        if let selected { selectedRaw = selected.style.rawValue }
+        selectionController.selectFilter(value)
     }
 
     private func synchronizeSelection() {
-        guard !applying else { return }
-        if !visibleArtworks.contains(where: { $0.id == selectedID }), let first = visibleArtworks.first {
-            selectedID = first.id
-            selectedRaw = first.style.rawValue
-        }
+        selectionController.synchronizeSelection()
     }
 
     private func restoreSelection() {
-        if let oldStyle = IslandGalleryStyle(rawValue: selectedRaw),
-           !oldStyle.isAvailableInGallery {
-            selectedRaw = IslandGalleryStyle.starlight.rawValue
-            if selectedID == IslandGalleryArtwork(style: oldStyle).id {
-                selectedID = ""
-            }
-        }
-        guard selectedID.isEmpty else { return }
-        if (activeFlagsRaw & 1) != 0 && activeIslandModeRaw == IslandGalleryStyle.singularityLive.rawValue {
-            // Remote identity must survive before the catalog has arrived.
-            selectedID = activeLiveID
-        } else if let active = activeArtwork { selectedID = active.id }
-        else {
-            let style = IslandGalleryStyle(rawValue: selectedRaw) ?? .starlight
-            selectedID = IslandGalleryArtwork(style: style).id
-        }
+        EagleIslandGalleryRecovery.restore(
+            readSelectedRaw: { selectedRaw },
+            writeSelectedRaw: { selectedRaw = $0 },
+            readSelectedID: { selectedID },
+            writeSelectedID: { selectedID = $0 },
+            styleForRaw: { IslandGalleryStyle(rawValue: $0) },
+            isAvailable: { $0.isAvailableInGallery },
+            defaultStyle: { IslandGalleryStyle.starlight },
+            remoteStyle: { IslandGalleryStyle.singularityLive },
+            artworkID: { IslandGalleryArtwork(style: $0).id },
+            readActiveFlags: { activeFlagsRaw },
+            readActiveMode: { activeIslandModeRaw },
+            readActiveLiveID: { activeLiveID },
+            activeArtworkID: { activeArtwork?.id }
+        )
     }
 
     private func step(_ delta: Int) {
-        guard !applying, visibleArtworks.count > 1 else { return }
-        let next = (selectionIndex + delta + visibleArtworks.count) % visibleArtworks.count
-        select(visibleArtworks[next])
+        selectionController.step(delta)
     }
 
     private func animatedStep(_ delta: Int) {
@@ -630,53 +613,40 @@ struct IslandGalleryView: View {
     }
 
     private func loadCatalog(force: Bool = false) async {
-        guard !loading else { return }
-        loading = true
-        defer { loading = false }
-        do {
-            let themes = try await IslandLiveMedia.loadCatalog(force: force)
-            guard !Task.isCancelled else { return }
-            liveThemes = themes
-            loadFailed = false
-            restoreSelection()
-            synchronizeSelection()
-        } catch {
-            if !Task.isCancelled { loadFailed = true }
-        }
+        await EagleIslandGalleryLoadFlow.load(
+            force: force,
+            readLoading: { loading },
+            writeLoading: { loading = $0 },
+            fetch: { try await IslandLiveMedia.loadCatalog(force: $0) },
+            writeThemes: { liveThemes = $0 },
+            writeFailed: { loadFailed = $0 },
+            restoreSelection: { restoreSelection() },
+            synchronizeSelection: { synchronizeSelection() }
+        )
     }
 
     private func apply(_ item: IslandGalleryArtwork) {
-        guard !applying else { return }
-        select(item)
-        applying = true
-        Task { @MainActor in
-            let response: IslandGalleryApplyResult
-            if let theme = item.liveTheme {
-                response = await IslandGalleryExecutor.shared.applyLive(
-                    theme,
-                    shadowIntensity: shadowIntensity
-                )
-            } else {
-                response = await IslandGalleryExecutor.shared.apply(
-                    item.style,
-                    shadowIntensity: shadowIntensity
-                )
-            }
-            applying = false
-            UINotificationFeedbackGenerator().notificationOccurred(response.succeeded ? .success : .error)
-            EagleNotifications.shared.result(response.succeeded, title: "Island Gallery", message: response.message)
-        }
+        EagleIslandGalleryActionFlow.apply(
+            item,
+            isApplying: { applying },
+            select: { select($0) },
+            setApplying: { applying = $0 },
+            liveTheme: { $0.liveTheme },
+            applyLive: { await IslandGalleryExecutor.shared.applyLive($0, shadowIntensity: shadowIntensity) },
+            applyStyle: { await IslandGalleryExecutor.shared.apply($0.style, shadowIntensity: shadowIntensity) },
+            feedback: { UINotificationFeedbackGenerator().notificationOccurred($0.succeeded ? .success : .error) },
+            notify: { EagleNotifications.shared.result($0.succeeded, title: "Island Gallery", message: $0.message) }
+        )
     }
 
     private func restore() {
-        guard !applying else { return }
-        applying = true
-        Task { @MainActor in
-            let response = await IslandGalleryExecutor.shared.restore()
-            applying = false
-            UINotificationFeedbackGenerator().notificationOccurred(response.succeeded ? .success : .error)
-            EagleNotifications.shared.result(response.succeeded, title: "Island Gallery", message: response.message)
-        }
+        EagleIslandGalleryActionFlow.restore(
+            isApplying: { applying },
+            setApplying: { applying = $0 },
+            execute: { await IslandGalleryExecutor.shared.restore() },
+            feedback: { UINotificationFeedbackGenerator().notificationOccurred($0.succeeded ? .success : .error) },
+            notify: { EagleNotifications.shared.result($0.succeeded, title: "Island Gallery", message: $0.message) }
+        )
     }
 }
 

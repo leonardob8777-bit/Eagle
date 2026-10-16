@@ -39,6 +39,8 @@ struct EagleNotificationGeometry {
     let shadowOpacity: CGFloat
     let offsetY: CGFloat
     let widthRatio: CGFloat
+    /// 0-1 while the neck joins island and drop; the island swells with it.
+    let neckProfile: CGFloat
 
     static func clamp(_ value: CGFloat, _ low: CGFloat = 0, _ high: CGFloat = 1) -> CGFloat {
         min(high, max(low, value))
@@ -65,6 +67,7 @@ struct EagleNotificationGeometry {
         shadowOpacity = Self.clamp(expand)
         offsetY = cy - l.cardCenterY
         widthRatio = w / l.cardWidth
+        neckProfile = profile
     }
 }
 
@@ -125,6 +128,8 @@ struct EagleNotificationMorph<Content: View>: View, Animatable {
     var reveal: CGFloat
     var tint: CGFloat
     var dragY: CGFloat
+    /// 1 when the card is white, 0 when it is black (the drop then stays the island's black).
+    var cardTone: CGFloat = 1
     @ViewBuilder let content: () -> Content
 
     var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
@@ -141,16 +146,14 @@ struct EagleNotificationMorph<Content: View>: View, Animatable {
         let overshoot = EagleNotificationGeometry.clamp(g.widthRatio - 1, 0, 0.2)
         let scale = 0.88 + 0.12 * progress + overshoot * progress
         ZStack(alignment: .topLeading) {
-            EagleNotificationGooSurface(layout: layout, geometry: g, tint: tint)
+            EagleNotificationGooSurface(layout: layout, geometry: g, tint: tint * cardTone)
             .frame(width: layout.width, height: layout.canvasHeight)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
 
+            // The reference reveals the body through a fading blur; on Eagle it read as blurry, so the
+            // body appears sharp: it fades in and settles from 88% scale onto the card.
             content()
-                // expo-blur on iOS is a UIVisualEffectView. Keeping the same
-                // material instead of applying a Gaussian blur to the text is
-                // essential to the reference reveal.
-                .overlay(EagleNotificationRevealBlur(progress: progress))
                 .clipShape(RoundedRectangle(cornerRadius: layout.cardRadius, style: .continuous))
                 .opacity(Double(progress))
                 .scaleEffect(scale)
@@ -178,79 +181,91 @@ private struct EagleNotificationGooSurface: UIViewRepresentable {
 
 /// Native equivalent of the reference's Skia layer:
 /// RoundedRect sources -> Gaussian blur -> alpha matrix -> sharp island.
-/// The filters are event-driven and only redraw while SwiftUI advances the
-/// short notification transition; there is no permanent display link.
+/// Each animation step renders only the region that holds the island, neck and drop (plus the blur's
+/// reach) and hands the image to a layer, so nothing is redrawn on the CPU. The shadow and the sharp
+/// island are plain Core Animation layers. Event-driven: no permanent display link.
 private final class EagleNotificationGooView: UIView {
     private static let ciContext = CIContext(options: [
         .cacheIntermediates: false,
         .workingColorSpace: NSNull()
     ])
+    private static let blur: CGFloat = 5 + 0.62 * (20 - 5) // 14.3, from the reference.
 
-    private var notificationLayout = EagleNotificationLayout(width: 1, insetTop: 0)
-    private var notificationGeometry = EagleNotificationGeometry(
-        drop: 0, expand: 0, layout: EagleNotificationLayout(width: 1, insetTop: 0)
-    )
-    private var notificationTint: CGFloat = 0
+    private let shadowLayer = CALayer()
+    private let gooLayer = CALayer()
+    private let islandLayer = CAShapeLayer()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        contentMode = .redraw
-        layer.drawsAsynchronously = true
         isUserInteractionEnabled = false
+        let still: [String: CAAction] = ["contents": NSNull(), "frame": NSNull(), "bounds": NSNull(),
+                                         "position": NSNull(), "path": NSNull(), "shadowPath": NSNull(),
+                                         "shadowOpacity": NSNull()]
+        // Skia draws this shadow outside the filtered group with shadowOnly.
+        shadowLayer.shadowColor = UIColor(red: 16 / 255, green: 19 / 255, blue: 28 / 255, alpha: 1).cgColor
+        shadowLayer.shadowOffset = CGSize(width: 0, height: 10)
+        shadowLayer.shadowRadius = 7
+        shadowLayer.actions = still
+        gooLayer.actions = still
+        gooLayer.contentsGravity = .resize
+        gooLayer.minificationFilter = .linear
+        gooLayer.magnificationFilter = .linear
+        // The hardware-aligned pill is deliberately sharp and sits above the goo.
+        islandLayer.fillColor = UIColor.black.cgColor
+        islandLayer.actions = still
+        layer.addSublayer(shadowLayer)
+        layer.addSublayer(gooLayer)
+        layer.addSublayer(islandLayer)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func update(layout: EagleNotificationLayout,
-                geometry: EagleNotificationGeometry,
-                tint: CGFloat) {
-        notificationLayout = layout
-        notificationGeometry = geometry
-        notificationTint = tint
-        setNeedsDisplay()
+    private var last: (EagleNotificationLayout, EagleNotificationGeometry, CGFloat)?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // The first update can arrive before the view has a size (and an immediate replacement
+        // never sends a second one), so render again once the size is known.
+        if let last { update(layout: last.0, geometry: last.1, tint: last.2) }
     }
 
-    override func draw(_ rect: CGRect) {
-        guard bounds.width > 0, bounds.height > 0,
-              let target = UIGraphicsGetCurrentContext() else { return }
+    func update(layout l: EagleNotificationLayout,
+                geometry g: EagleNotificationGeometry,
+                tint: CGFloat) {
+        last = (l, g, tint)
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
 
-        let l = notificationLayout
-        let g = notificationGeometry
-        // Goo is intentionally blurred by 14.3 pt. Two samples per point are
-        // visually lossless for that filtered layer and avoid a 3x offscreen
-        // texture on Pro/Max phones. Text and the sharp island remain native.
-        let scale = min(window?.screen.scale ?? traitCollection.displayScale, 2)
+        // The island swells slightly while the neck pulls a drop out of it (or draws one back in).
+        let island = l.islandRect.insetBy(dx: -5 * g.neckProfile, dy: -1.6 * g.neckProfile)
+        islandLayer.path = CGPath(roundedRect: island, cornerWidth: island.height / 2,
+                                  cornerHeight: island.height / 2, transform: nil)
+        let hasDrop = g.rect.width > 0.5 && g.rect.height > 0.5
+        shadowLayer.shadowOpacity = hasDrop ? Float(0.20 * g.shadowOpacity) : 0
+        if hasDrop {
+            shadowLayer.shadowPath = CGPath(roundedRect: g.rect, cornerWidth: g.radius,
+                                            cornerHeight: g.radius, transform: nil)
+        }
 
-        // Skia draws this shadow outside the filtered group with shadowOnly.
-        target.saveGState()
-        target.setFillColor(UIColor(red: 0.075, green: 0.084, blue: 0.105, alpha: 1).cgColor)
-        target.setShadow(offset: CGSize(width: 0, height: 10), blur: 14,
-                         color: UIColor(red: 16/255, green: 19/255, blue: 28/255,
-                                        alpha: 0.20 * g.shadowOpacity).cgColor)
-        target.addPath(CGPath(roundedRect: g.rect, cornerWidth: g.radius,
-                              cornerHeight: g.radius, transform: nil))
-        target.fillPath()
-        target.setShadow(offset: .zero, blur: 0, color: nil)
-        target.setBlendMode(.clear)
-        target.addPath(CGPath(roundedRect: g.rect, cornerWidth: g.radius,
-                              cornerHeight: g.radius, transform: nil))
-        target.fillPath()
-        target.restoreGState()
+        // Region worth filtering: everything the blur of the island, neck and drop can reach.
+        let blur = Self.blur
+        var region = island
+        if g.neck.width > 0, g.neck.height > 0 { region = region.union(g.neck) }
+        if hasDrop { region = region.union(g.rect) }
+        region = region.insetBy(dx: -blur * 2.2, dy: -blur * 2.2).intersection(bounds).integral
+        guard !region.isEmpty else { gooLayer.contents = nil; return }
 
-        let blur: CGFloat = 5 + 0.62 * (20 - 5) // 14.3, from the reference.
-        let inset = blur * 0.26
-        let dropletTone = EagleNotificationGeometry.clamp(
-            (notificationTint - 0.06) / (0.88 - 0.06)
-        )
-        let pixelExtent = CGRect(x: 0, y: 0,
-                                 width: bounds.width * scale,
-                                 height: bounds.height * scale)
+        // The goo's edge is a soft ~3 pt ramp after the 14.3 pt blur, so one sample per point is
+        // visually lossless and four times cheaper than the screen's 2-3x.
+        let scale: CGFloat = 1
+        let pixels = CGRect(x: 0, y: 0, width: region.width * scale, height: region.height * scale)
         func ciRect(_ rect: CGRect) -> CGRect {
-            // Core Image's origin is bottom-left; Eagle layout is top-left.
-            CGRect(x: rect.minX * scale,
-                   y: (bounds.height - rect.maxY) * scale,
-                   width: rect.width * scale,
-                   height: rect.height * scale)
+            // Core Image's origin is bottom-left; the region is top-left.
+            CGRect(x: (rect.minX - region.minX) * scale,
+                   y: (region.maxY - rect.maxY) * scale,
+                   width: rect.width * scale, height: rect.height * scale)
         }
         func rounded(_ rect: CGRect, _ radius: CGFloat, _ color: CIColor) -> CIImage? {
             guard rect.width > 0, rect.height > 0,
@@ -260,62 +275,37 @@ private final class EagleNotificationGooView: UIView {
             filter.setValue(color, forKey: kCIInputColorKey)
             return filter.outputImage
         }
-        let clear = CIImage(color: CIColor.clear).cropped(to: pixelExtent)
-        let island = l.islandRect.insetBy(dx: inset, dy: inset)
-        var sources = clear
-        if let shape = rounded(island, max(0, l.islandRadius - inset), .black) {
+        let inset = blur * 0.26
+        // The drop leaves the island black and turns into the white card (reference interpolateColor).
+        let tone = EagleNotificationGeometry.clamp((tint - 0.06) / (0.88 - 0.06))
+        var sources = CIImage(color: CIColor.clear).cropped(to: pixels)
+        if let shape = rounded(island.insetBy(dx: inset, dy: inset),
+                               max(0, island.height / 2 - inset), .black) {
             sources = shape.composited(over: sources)
         }
         if let shape = rounded(g.neck, g.neck.width / 2, .black) {
             sources = shape.composited(over: sources)
         }
-        if let shape = rounded(g.rect, g.radius,
-                               CIColor(red: 0.075 + 0.025 * dropletTone,
-                                       green: 0.084 + 0.025 * dropletTone,
-                                       blue: 0.105 + 0.025 * dropletTone, alpha: 1)) {
+        // The cutoff (0.43) grows a lone shape by ~2.5 pt and leaves a soft rim; inset the drop so
+        // that, once expanded, the goo sits entirely under the sharp card instead of haloing it.
+        let rim = min(3.5, min(g.rect.width, g.rect.height) * 0.1)
+        if hasDrop, let shape = rounded(g.rect.insetBy(dx: rim, dy: rim), max(0, g.radius - rim),
+                                        CIColor(red: tone, green: tone, blue: tone, alpha: 1)) {
             sources = shape.composited(over: sources)
         }
-
-        let blurred = sources
-                .clampedToExtent()
-                .applyingFilter("CIGaussianBlur", parameters: [
-                    kCIInputRadiusKey: blur * scale
-                ])
-                .cropped(to: pixelExtent)
-            let matrix = blurred.applyingFilter("CIColorMatrix", parameters: [
+        let goo = sources
+            .clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: blur * scale])
+            .cropped(to: pixels)
+            .applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: 1, y: 0, z: 0, w: 0),
                 "inputGVector": CIVector(x: 0, y: 1, z: 0, w: 0),
                 "inputBVector": CIVector(x: 0, y: 0, z: 1, w: 0),
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 22),
                 "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: -22 * 0.43)
             ])
-        if let result = Self.ciContext.createCGImage(matrix, from: pixelExtent) {
-            target.saveGState()
-            target.interpolationQuality = .high
-            UIImage(cgImage: result, scale: scale, orientation: .up).draw(in: bounds)
-            target.restoreGState()
-        }
-
-        // The hardware-aligned pill is deliberately sharp and sits above goo.
-        target.setFillColor(UIColor.black.cgColor)
-        target.addPath(CGPath(roundedRect: l.islandRect,
-                              cornerWidth: l.islandRadius,
-                              cornerHeight: l.islandRadius,
-                              transform: nil))
-        target.fillPath()
-    }
-}
-
-private struct EagleNotificationRevealBlur: UIViewRepresentable {
-    let progress: CGFloat
-
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        let view = UIVisualEffectView(effect: UIBlurEffect(style: .light))
-        view.isUserInteractionEnabled = false
-        return view
-    }
-
-    func updateUIView(_ view: UIVisualEffectView, context: Context) {
-        view.alpha = 1 - EagleNotificationGeometry.clamp(progress)
+        gooLayer.frame = region
+        gooLayer.contentsScale = scale
+        gooLayer.contents = Self.ciContext.createCGImage(goo, from: pixels)
     }
 }

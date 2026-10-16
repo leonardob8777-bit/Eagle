@@ -43,8 +43,10 @@ for snippet in (
 ):
     assert snippet in native, f"missing native shadow/read-back contract: {snippet}"
 
-# The pre-existing Dock control must remain Dock light, not be repurposed.
-assert 'en: "Dock light", es: "Luz del Dock"' in dock
+# Dock's label now matches Island visually; its independent control remains unchanged.
+assert 'en: "Shadow", es: "Sombra"' in dock
+assert 'Slider(value: $glowIntensity, in: 0...1, step: 0.01)' in dock
+assert 'en: "Dock light intensity", es: "Intensidad de luz del Dock"' in dock
 assert "Dock shadow intensity" not in dock
 
 for raw in (-100, -1, 0, 1, 72, 100, 101, 999):

@@ -11,3 +11,6 @@ DerivedData/
 *.pem
 *.key
 *.xcarchive
+artifacts/
+__pycache__/
+*.py[cod]

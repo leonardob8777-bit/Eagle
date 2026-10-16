@@ -8,15 +8,14 @@ import tempfile
 import zipfile
 
 repo = Path(__file__).resolve().parents[1]
-source = (repo / "lara/classes/zipmgr.swift").read_text().split("private func writeLE16(")[0]
-stub = '\nclass laramgr { static let shared = laramgr(); func logmsg(_ message: String) {} }\n'
+core = repo / "lara/EagleCore/Archives/EagleZIPArchive.swift"
 runner = r'''
 var checked = 0
 for path in CommandLine.arguments.dropFirst() {
     FileHandle.standardError.write(Data(("Checking " + URL(fileURLWithPath: path).lastPathComponent + "\n").utf8))
     let invalid = path.hasSuffix(".bad.zip")
     do {
-        let archive = try ZipArchive(data: Data(contentsOf: URL(fileURLWithPath: path)))
+        let archive = try ZipArchive(data: Data(contentsOf: URL(fileURLWithPath: path)), log: { _ in })
         for entry in archive.entries { _ = try archive.extract(entry) }
         precondition(!invalid, "Malformed archive was accepted: \(path)")
     } catch {
@@ -29,9 +28,10 @@ print("PASS: production ZIP reader, \(checked) valid/truncated/oversized cases")
 with tempfile.TemporaryDirectory(prefix="eagle-zip-qa-") as directory:
     work = Path(directory)
     swift = work / "main.swift"
-    swift.write_text(source + stub + runner)
+    swift.write_text("import Foundation\n" + runner)
     binary = work / "verify"
-    subprocess.run(["swiftc", "-swift-version", "5", str(swift), "-o", str(binary)], check=True)
+    # Compile the exact complete production core; no Lara manager or source slicing.
+    subprocess.run(["swiftc", "-swift-version", "5", str(core), str(swift), "-o", str(binary)], check=True)
     cases = []
     def case(name, data, bad=False):
         path = work / (name + (".bad.zip" if bad else ".zip"))

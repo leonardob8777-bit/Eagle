@@ -119,7 +119,7 @@ struct PasscodeExploreView: View {
             }
             .padding(16)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle(LaraL10n.text(en: "Explore styles", es: "Explorar estilos"))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
@@ -202,6 +202,8 @@ struct PasscodeExploreView: View {
                 Task { await gallery.loadThemes(forceRefresh: true) }
             }
             .buttonStyle(.borderedProminent)
+            // The contrasting colour on the black/white fill, grey while disabled.
+            .eagleProminentLabel()
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -232,20 +234,22 @@ private struct PasscodeGalleryCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(theme.name).font(.headline).lineLimit(1)
+                        // Long names shrink a little before they are cut short.
+                        Text(theme.name).font(.headline).lineLimit(1).minimumScaleFactor(0.8)
                         Text(theme.authorLine)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
-                    Spacer()
+                    Spacer(minLength: 4)
                     Button(action: onToggleFavorite) {
                         Image(systemName: isFavorite ? "heart.fill" : "heart")
                             .foregroundStyle(isFavorite ? Color.pink : Color.secondary)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(EaglePressableStyle(kind: .swatch))
                     .accessibilityLabel(isFavorite
                         ? LaraL10n.text(en: "Remove from favorites", es: "Quitar de favoritos")
                         : LaraL10n.text(en: "Add to favorites", es: "Agregar a favoritos"))
@@ -260,13 +264,15 @@ private struct PasscodeGalleryCard: View {
 
                 Button(action: onDownload) {
                     HStack {
-                        if isDownloading { ProgressView().controlSize(.small).tint(.white) } else { Image(systemName: "arrow.down.circle") }
+                        if isDownloading { ProgressView().controlSize(.small).tint(Color(uiColor: .systemBackground)) } else { Image(systemName: "arrow.down.circle") }
                         Text(LaraL10n.text(en: "Use style", es: "Usar estilo"))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                 }
                 .buttonStyle(.borderedProminent)
+                // The contrasting colour on the black/white fill, grey while disabled.
+                .eagleProminentLabel()
                 .disabled(isDownloading)
             }
             .padding()

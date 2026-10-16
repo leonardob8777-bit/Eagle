@@ -26,9 +26,12 @@ struct LaraHomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     header
+                        .eagleArrival(0)
                     channelSelector
+                        .eagleArrival(1)
                     if EagleFeaturePolicy.allows(.advancedSystemTools, channel: currentChannel) {
                         laboratoryTools
+                            .eagleArrival(2)
                     }
 
                     if normalizedToolQuery.isEmpty {
@@ -42,11 +45,13 @@ struct LaraHomeView: View {
                                     )
                                 )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(EaglePressableStyle())
+                            .eagleScrollDepth()
 
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(LaraL10n.text(en: "Customize one part", es: "Personalizar una parte"))
                                     .font(.headline)
+                                    .eagleBackdropText()
                                     .padding(.horizontal, 2)
                                     .accessibilityAddTraits(.isHeader)
 
@@ -170,7 +175,7 @@ struct LaraHomeView: View {
                                         es: "Icon Studio estará disponible próximamente"
                                     ))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(EaglePressableStyle(kind: .row))
                                 .background(Color(uiColor: .secondarySystemGroupedBackground))
                                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                                 .overlay {
@@ -191,19 +196,27 @@ struct LaraHomeView: View {
                                     artwork: .styles
                                 )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(EaglePressableStyle())
+                            .eagleScrollDepth()
                         }
+                        .eagleArrival(3)
                     } else {
                         toolSearchResults
+                            // Results slide in and out as the query changes instead of jumping.
+                            .animation(.spring(response: 0.35, dampingFraction: 0.86), value: filteredToolRoutes)
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
                 .padding(.bottom, 36)
+                // Starting or clearing a search crossfades between the tools and the results.
+                .animation(.easeInOut(duration: 0.22), value: normalizedToolQuery.isEmpty)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(EagleBackdrop().ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .eagleRootNavigationBar()
+            .eagleStatusBarVeil()
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
                     .environmentObject(mgr)
@@ -256,9 +269,10 @@ struct LaraHomeView: View {
                 accent: .primary
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle(kind: .row))
         .background(Color(uiColor: .secondarySystemGroupedBackground),
                     in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityIdentifier("laboratory-tools")
     }
 
@@ -413,7 +427,7 @@ struct LaraHomeView: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle())
         .animation(.easeInOut(duration: 0.18), value: isSelected)
         .accessibilityLabel(channel.title)
         .accessibilityValue(
@@ -544,7 +558,7 @@ struct LaraHomeView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 44, height: 44)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(EaglePressableStyle(kind: .swatch))
                 .accessibilityLabel(LaraL10n.text(
                     en: "Clear search",
                     es: "Limpiar búsqueda"
@@ -598,7 +612,7 @@ struct LaraHomeView: View {
                     }
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(EaglePressableStyle(kind: .row))
             .background(Color(uiColor: .secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay {
@@ -1111,6 +1125,7 @@ private struct LaraFeatureCard: View {
 private struct AuraStudioHeroCard: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var neonOnScreen = false
 
     let title: String
     let subtitle: String
@@ -1143,10 +1158,7 @@ private struct AuraStudioHeroCard: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(EagleVisualTheme.surfaceBorder(for: colorScheme), lineWidth: 1)
         }
-        .shadow(
-            color: EagleVisualTheme.surfaceShadow(for: colorScheme),
-            radius: 10, x: 0, y: 4
-        )
+        .eagleSurfaceShadow(cornerRadius: 24)
         .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
@@ -1176,6 +1188,10 @@ private struct AuraStudioHeroCard: View {
             auroraBlob(Color(red: 0.35, green: 0.95, blue: 0.72), size: 120,
                        x: -104, y: 34, opacity: colorScheme == .dark ? 0.22 : 0.13)
         }
+        // The card's full size, flattened into one image: the four large blurs are rendered once and
+        // kept, instead of being composed again on every frame of the turning neon ring above them.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .drawingGroup()
         .allowsHitTesting(false)
     }
 
@@ -1190,36 +1206,51 @@ private struct AuraStudioHeroCard: View {
             .opacity(opacity)
     }
 
+    /// The neon ring turns at 60 frames a second (at 30 its edge stepped visibly) and stops while the
+    /// card is off screen. Only the coloured ring is redrawn each frame: the glow and the capsule do not
+    /// depend on the turn (the shadows follow the ring's shape, not its colours), so they are drawn
+    /// once, outside the clock, instead of re-blurring two shadows every frame. Looks the same.
     private var neonCapsule: some View {
-        TimelineView(.animation(paused: reduceMotion)) { context in
-            let cycles = context.date.timeIntervalSinceReferenceDate / 5.2
-            let angle = reduceMotion ? 0 : (cycles - floor(cycles)) * 360
+        ZStack {
+            Capsule(style: .continuous)
+                .stroke(Color.purple.opacity(0.30), lineWidth: 15)
+                .frame(width: 128, height: 48)
+                .blur(radius: 14)
 
-            ZStack {
-                Capsule(style: .continuous)
-                    .stroke(Color.purple.opacity(0.30), lineWidth: 15)
-                    .frame(width: 128, height: 48)
-                    .blur(radius: 14)
+            // The capsule with the ring's exact outline, and its glow.
+            Capsule(style: .continuous)
+                .fill(Color.black)
+                .frame(width: 122, height: 44)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .stroke(Color.black, lineWidth: 3)
+                }
+                .shadow(color: .cyan.opacity(0.5), radius: 10)
+                .shadow(color: .pink.opacity(0.36), radius: 16)
 
-                Capsule(style: .continuous)
-                    .fill(Color.black)
-                    .frame(width: 122, height: 44)
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .stroke(
-                                AngularGradient(
-                                    colors: [.cyan, .blue, .purple, .pink, .orange, .cyan],
-                                    center: .center,
-                                    angle: .degrees(angle)
-                                ),
-                                lineWidth: 3
-                            )
-                    }
-                    .shadow(color: .cyan.opacity(0.5), radius: 10)
-                    .shadow(color: .pink.opacity(0.36), radius: 16)
+            // The colours are painted once and only turned (a transform, nearly free to draw); turning
+            // the gradient about the centre is exactly what changing its angle did.
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion || !neonOnScreen)) { context in
+                let cycles = context.date.timeIntervalSinceReferenceDate / 5.2
+                let angle = reduceMotion ? 0 : (cycles - floor(cycles)) * 360
+                AngularGradient(
+                    colors: [.cyan, .blue, .purple, .pink, .orange, .cyan],
+                    center: .center
+                )
+                // Big enough that, turning, it always covers the capsule's ends (half-diagonal ≈ 66 pt).
+                .frame(width: 140, height: 140)
+                .rotationEffect(.degrees(angle))
+                .frame(width: 122, height: 44)
+                .mask {
+                    Capsule(style: .continuous)
+                        .stroke(lineWidth: 3)
+                        .frame(width: 122, height: 44)
+                }
             }
-            .frame(width: 138, height: 96)
         }
+        .frame(width: 138, height: 96)
+        .onAppear { neonOnScreen = true }
+        .onDisappear { neonOnScreen = false }
         .accessibilityHidden(true)
     }
 }
@@ -1238,8 +1269,12 @@ private struct LaraToolRow: View {
     var body: some View {
         HStack(spacing: 13) {
             Image(systemName: systemImage)
+                // Symbols such as "textformat" are redrawn per language (格式 in Chinese); the row
+                // icons keep their Latin design in every language.
+                .environment(\.locale, Locale(identifier: "en"))
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.primary)
+                .eagleArrivalBounce()
                 .frame(width: 38, height: 38)
                 .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
 
@@ -1299,6 +1334,7 @@ struct EagleCountBadge: View {
         HStack(spacing: 4) {
             Image(systemName: "bell.fill")
                 .font(.system(size: 9, weight: .bold))
+                .eagleArrivalBounce(delay: 0.6)
             Text("\(count)")
                 .font(.system(size: 11, weight: .heavy))
                 .contentTransition(.numericText())

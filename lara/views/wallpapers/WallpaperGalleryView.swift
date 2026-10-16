@@ -334,7 +334,7 @@ struct WallpaperGalleryView: View {
                                 } label: {
                                     CommunityWallpaperCard(wallpaper: wallpaper)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(EaglePressableStyle())
 
                                 favoriteButton(
                                     for: wallpaper,
@@ -402,10 +402,11 @@ struct WallpaperGalleryView: View {
             Image(systemName: favorite ? "heart.fill" : "heart")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(favorite ? Color.pink : Color.primary)
+                .eagleSymbolPop(favorite)
                 .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial, in: Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(EaglePressableStyle(kind: .swatch))
         .accessibilityLabel(favorite
             ? LaraL10n.text(en: "Remove from favorites", es: "Quitar de favoritos")
             : LaraL10n.text(en: "Add to favorites", es: "Agregar a favoritos"))
@@ -441,6 +442,8 @@ struct WallpaperGalleryView: View {
                 Task { await gallery.load(forceRefresh: true) }
             }
             .buttonStyle(.borderedProminent)
+            // The contrasting colour on the black/white fill, grey while disabled.
+            .eagleProminentLabel()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
@@ -598,10 +601,6 @@ private struct CommunityWallpaperDetail: View {
                     }
                 }
 
-                if !mgr.sbxready {
-                    LaraAccessView(compact: true)
-                }
-
                 if isIncompatible {
                     Label("Requiere iOS 26", systemImage: "exclamationmark.triangle.fill")
                         .font(.subheadline.weight(.semibold))
@@ -611,12 +610,22 @@ private struct CommunityWallpaperDetail: View {
                         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
 
+                Text("Los fondos y sus vistas previas pertenecen a sus respectivos creadores. Eagle instala una copia local y no modifica otros fondos.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(20)
+            .padding(.bottom, 24)
+        }
+        // "Add to Wallpapers" stays fixed at the bottom; Prepare takes its place until Eagle is ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            EagleApplyBar(ready: mgr.sbxready) {
                 Button {
                     Task { await gallery.install(wallpaper) }
                 } label: {
                     HStack {
                         if isInstalling {
-                            ProgressView().tint(.white)
+                            ProgressView().tint(EagleVisualTheme.actionText)
                         } else {
                             Image(systemName: "arrow.down.circle.fill")
                         }
@@ -626,18 +635,11 @@ private struct CommunityWallpaperDetail: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(EagleApplyButtonStyle(busy: isInstalling))
                 .disabled(!mgr.sbxready || gallery.installingID != nil || isIncompatible)
-
-                Text("Los fondos y sus vistas previas pertenecen a sus respectivos creadores. Eagle instala una copia local y no modifica otros fondos.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
-            .padding(20)
-            .padding(.bottom, 24)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Vista previa")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

@@ -2440,6 +2440,8 @@ struct CompleteStylesView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                // Reads over the dark top of the backdrop too, when it scrolls up there.
+                .eagleBackdropText()
                 .padding(.top, 2)
 
                 LazyVGrid(columns: columns, spacing: 12) {
@@ -2496,12 +2498,13 @@ struct CompleteStylesView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .eagleBackdropText()
             }
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 40)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .eagleScreenBackdrop()
         .navigationTitle("Estilos")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { manager.refreshCompatibility() }
@@ -2542,6 +2545,7 @@ struct CompleteStylesView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .eagleHeaderCard()
     }
 
     private func activeStyle(_ pack: CompleteStylePack, name: String) -> some View {
@@ -2633,6 +2637,8 @@ private struct CompleteStyleCard: View {
                 }
             }
             .frame(height: 132)
+            // The motif's circles stay inside the artwork instead of spilling onto the name below.
+            .clipped()
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(pack.localizedName)
@@ -2693,13 +2699,15 @@ private struct CompleteStyleDetailView: View {
                     Label("Ver vista previa real", systemImage: "eye.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(EagleSecondaryButtonStyle())
                 .disabled(!(includeWallpaper || includePasscode || includeCard))
 
                 VStack(alignment: .leading, spacing: 7) {
+                    // Name and summary follow the backdrop beneath them, so they still read when they
+                    // scroll up onto its dark top.
                     Text(pack.localizedName)
                         .font(.largeTitle.bold())
+                        .eagleBackdropText()
                     Text(pack.localizedTagline)
                         .font(.title3.weight(.medium))
                         .foregroundStyle(pack.tertiary.color)
@@ -2707,15 +2715,10 @@ private struct CompleteStyleDetailView: View {
                         .font(.body)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .eagleBackdropText()
                 }
 
                 componentSummary
-
-                if !mgr.sbxready {
-                    LaraAccessView(compact: true) {
-                        manager.refreshCompatibility()
-                    }
-                }
 
                 DisclosureGroup(isExpanded: $showOptions) {
                     VStack(spacing: 0) {
@@ -2752,15 +2755,19 @@ private struct CompleteStyleDetailView: View {
                 .background(Color(uiColor: .secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-                applyBar
-
                 credits
             }
             .padding(.horizontal, 18)
             .padding(.top, 12)
             .padding(.bottom, 40)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        // Apply stays fixed at the bottom, in reach of the thumb; Prepare takes its place until ready.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            EagleApplyBar(ready: mgr.sbxready, onPrepared: { manager.refreshCompatibility() }) {
+                applyBar
+            }
+        }
+        .eagleScreenBackdrop()
         .navigationTitle(pack.localizedName)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { manager.refreshCompatibility() }
@@ -2810,7 +2817,8 @@ private struct CompleteStyleDetailView: View {
             } label: {
                 HStack(spacing: 10) {
                     if manager.isWorking {
-                        ProgressView().tint(.white)
+                        // Same colour as the text: a white spinner vanished on the white dark-mode button.
+                        ProgressView().tint(EagleVisualTheme.actionText)
                     } else {
                         Image(systemName: "sparkles")
                     }
@@ -2820,10 +2828,7 @@ private struct CompleteStyleDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(EagleVisualTheme.actionFill)
-            .foregroundStyle(EagleVisualTheme.actionText)
-            .controlSize(.large)
+            .buttonStyle(EagleApplyButtonStyle(busy: manager.isWorking))
             .disabled(manager.isWorking || !mgr.sbxready || !(includeWallpaper || includePasscode || includeCard))
         }
         .animation(.easeInOut(duration: 0.25), value: manager.isWorking)
@@ -2879,6 +2884,8 @@ private struct CompleteStyleDetailView: View {
         }
         .tint(pack.secondary.color)
         .padding(.vertical, 10)
+        // The disclosure clips its content at the edge, and the switch draws a little wider than its frame.
+        .padding(.trailing, 4)
         .disabled(!available)
     }
 
@@ -2895,6 +2902,7 @@ private struct CompleteStyleDetailView: View {
             )
             .font(.footnote.weight(.medium))
         }
+        .eagleBackdropText()
     }
 }
 
@@ -3101,6 +3109,8 @@ private struct CompleteStyleResultView: View {
                                 .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
+                            // The contrasting colour on the black/white fill, grey while disabled.
+                            .eagleProminentLabel()
                             .controlSize(.large)
                         }
 
@@ -3111,8 +3121,7 @@ private struct CompleteStyleResultView: View {
                                 Label("Elegir el fondo", systemImage: "photo.on.rectangle")
                                     .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.large)
+                            .buttonStyle(EagleSecondaryButtonStyle())
                         }
 
                         if manager.canUndo,
@@ -3126,14 +3135,13 @@ private struct CompleteStyleResultView: View {
                                 Label("Deshacer este cambio", systemImage: "arrow.uturn.backward")
                                     .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.large)
+                            .buttonStyle(EagleSecondaryButtonStyle())
                         }
                     }
                 }
                 .padding(20)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .eagleScreenBackdrop()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Listo") { dismiss() }
@@ -3169,7 +3177,7 @@ private struct StyleLivingSheen: View {
     var body: some View {
         GeometryReader { geo in
             let maxDim = max(geo.size.width, geo.size.height)
-            TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: reduceMotion)) { timeline in
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let x = 0.5 + 0.30 * cos(t * 0.33)
                 let y = 0.40 + 0.22 * sin(t * 0.26)
@@ -3197,7 +3205,8 @@ private struct StyleTravelingGlint: View {
         GeometryReader { geo in
             let w = geo.size.width
             let travel = w * 1.7
-            TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: reduceMotion)) { timeline in
+            // 60 fps: the glint travels about 110 pt a second, which steps visibly at 20.
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion)) { timeline in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let p = t.truncatingRemainder(dividingBy: period) / period
                 LinearGradient(

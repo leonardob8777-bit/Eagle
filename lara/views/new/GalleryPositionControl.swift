@@ -38,40 +38,21 @@ struct GalleryFilterBar: View {
                     .foregroundStyle(selected ? Color(uiColor: .systemBackground) : .primary)
                     .background(selected ? Color.primary : .clear, in: RoundedRectangle(cornerRadius: 13))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(EaglePressableStyle())
                 .accessibilityAddTraits(selected ? .isSelected : [])
                 .accessibilityIdentifier("\(accessibilityPrefix)-filter-\(item.id)")
             }
         }
         .padding(4)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 17))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 17))
+        // Opaque, so the filters read the same over the light top of the backdrop as over the dark.
+        .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+        // The highlight moves to the chosen filter with a quick crossfade instead of jumping.
+        .animation(.easeInOut(duration: 0.22), value: selectedID)
     }
 }
 
-nonisolated struct GalleryPosition: Equatable, Sendable {
-    let x: Double
-    let y: Double
-
-    static func component(_ value: Double) -> Double {
-        value.isFinite ? (min(12, max(-12, value)) * 4).rounded() / 4 : 0
-    }
-
-    init(x: Double, y: Double) {
-        self.x = Self.component(x)
-        self.y = Self.component(y)
-    }
-
-    static func saved(_ surface: String) -> Self {
-        Self(
-            x: UserDefaults.standard.double(
-                forKey: "eagle.\(surface)Gallery.positionX"
-            ),
-            y: UserDefaults.standard.double(
-                forKey: "eagle.\(surface)Gallery.positionY"
-            )
-        )
-    }
-}
+typealias GalleryPosition = EagleGalleryPosition
 
 struct GalleryPositionControl: View {
     @Binding var x: Double
@@ -79,6 +60,7 @@ struct GalleryPositionControl: View {
     var disabled: Bool
 
     @State private var step = 0.5
+    @State private var resetTurns = 0.0
 
     var body: some View {
         VStack(spacing: 12) {
@@ -100,8 +82,11 @@ struct GalleryPositionControl: View {
                 Button {
                     x = 0
                     y = 0
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) { resetTurns += 1 }
                 } label: {
+                    // Winds back a full turn as the position resets.
                     Image(systemName: "arrow.counterclockwise")
+                        .rotationEffect(.degrees(-360 * resetTurns))
                         .frame(width: 44, height: 44)
                 }
                 .accessibilityLabel(LaraL10n.text(
@@ -136,13 +121,22 @@ struct GalleryPositionControl: View {
             )
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
+            // The coordinates roll to each new value.
+            .contentTransition(.numericText())
+            .animation(.easeOut(duration: 0.2), value: x)
+            .animation(.easeOut(duration: 0.2), value: y)
         }
         .padding(14)
+        // Opaque like the other cards, so it does not take the backdrop's fade through it.
         .background(
-            Color.primary.opacity(0.04),
-            in: RoundedRectangle(cornerRadius: 18)
+            Color(uiColor: .secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
-        .buttonStyle(.plain)
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+        .buttonStyle(EaglePressableStyle())
         .disabled(disabled)
         .accessibilityElement(children: .contain)
     }

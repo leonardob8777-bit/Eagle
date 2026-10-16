@@ -1,7 +1,7 @@
 {
-  "name": "Eagle Beta",
+  "name": "Eagle",
   "subtitle": "Focused iOS personalization powered by DarkSword.",
-  "description": "Public beta builds of Eagle. Advanced features are experimental and may respring or reboot the device.",
+  "description": "Public releases of Eagle. Advanced features are experimental and may respring or reboot the device.",
   "iconURL": "https://raw.githubusercontent.com/leonardob8777-bit/Eagle/main/lara/other/media.xcassets/AppIcon.appiconset/Eagle-Light.png",
   "headerURL": "https://raw.githubusercontent.com/leonardob8777-bit/Eagle/main/lara/other/media.xcassets/AppIcon.appiconset/Eagle-Light.png",
   "website": "https://github.com/leonardob8777-bit/Eagle",
@@ -14,11 +14,29 @@
       "name": "Eagle",
       "bundleIdentifier": "com.leonardobaptiste.laracustom",
       "developerName": "Leonardo Baptiste and Eagle contributors",
-      "subtitle": "Focused iOS personalization — public beta.",
-      "localizedDescription": "Eagle is an experimental iOS personalization toolbox powered by DarkSword. This beta has been tested primarily on iPhone 16 Pro running iOS 18.6.2 (22G100). Compatibility with other devices and releases is not guaranteed. Back up important data and try one feature at a time.",
+      "subtitle": "Personalize your iPhone with Eagle.",
+      "localizedDescription": "Eagle brings Styles, Wallpapers, Cards, Passcode, Dock, Island and Aura customization together. Available in English, Spanish and Simplified Chinese. Features require compatible devices and iOS versions; see the repository compatibility matrix before installing. The primary physical reference remains iPhone 16 Pro on iOS 18.6.2 (22G100). Back up important data and try one feature at a time.",
       "iconURL": "https://raw.githubusercontent.com/leonardob8777-bit/Eagle/main/lara/other/media.xcassets/AppIcon.appiconset/Eagle-Light.png",
       "tintColor": "#20BDE9",
       "versions": [
+        {
+          "version": "1.0.6",
+          "buildVersion": "95",
+          "date": "2026-10-16",
+          "size": 14245290,
+          "downloadURL": "https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.6/Eagle-1.0.6-95.ipa",
+          "localizedDescription": "Simplified Chinese, a new Eagle icon and animated opening, fixed Prepare/Apply bars, 31 new online Dock backgrounds (18 Static and 13 Live), clearer light/dark controls and smoother touch, tab and progress feedback. iOS compatibility is unchanged. Sign with your usual installation method.",
+          "minOSVersion": "16.0"
+        },
+        {
+          "version": "1.0.5",
+          "buildVersion": "92",
+          "date": "2026-09-26",
+          "size": 18327350,
+          "downloadURL": "https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.5/Eagle-1.0.5-92.ipa",
+          "localizedDescription": "Refreshed Island and Dock galleries, precise position controls, Access/Customize navigation and updated Settings and Laboratory Tools.",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "0.3.0",
           "date": "2026-08-14",
