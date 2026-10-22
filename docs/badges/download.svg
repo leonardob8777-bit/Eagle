@@ -1,9 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="319" height="28" role="img" aria-label="DOWNLOAD EAGLE.IPA: VERSION 1.0.6">
-  <title>DOWNLOAD EAGLE.IPA: VERSION 1.0.6</title>
-  <rect width="185" height="28" fill="#444"/>
-  <rect x="185" width="134" height="28" fill="#171717"/>
-  <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="10" letter-spacing="1">
-    <text x="92.5" y="18">DOWNLOAD EAGLE.IPA</text>
-    <text x="252" y="18" font-weight="bold">VERSION 1.0.6</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="64" viewBox="0 0 340 64" role="img" aria-label="Download Eagle 1.0.6 IPA">
+  <title>Download Eagle 1.0.6 IPA</title>
+  <defs>
+    <linearGradient id="spectrum" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0.0%" stop-color="#22d3ee"/><stop offset="12.5%" stop-color="#3b82f6"/><stop offset="25.0%" stop-color="#8b5cf6"/><stop offset="37.5%" stop-color="#ec4899"/><stop offset="50.0%" stop-color="#ef4444"/><stop offset="62.5%" stop-color="#f97316"/><stop offset="75.0%" stop-color="#eab308"/><stop offset="87.5%" stop-color="#22c55e"/><stop offset="100.0%" stop-color="#22d3ee"/></linearGradient>
+    <linearGradient id="orb" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0.0%" stop-color="#22d3ee"/><stop offset="12.5%" stop-color="#3b82f6"/><stop offset="25.0%" stop-color="#8b5cf6"/><stop offset="37.5%" stop-color="#ec4899"/><stop offset="50.0%" stop-color="#ef4444"/><stop offset="62.5%" stop-color="#f97316"/><stop offset="75.0%" stop-color="#eab308"/><stop offset="87.5%" stop-color="#22c55e"/><stop offset="100.0%" stop-color="#22d3ee"/></linearGradient>
+  </defs>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif">
+    <rect x="1.5" y="1.5" width="337" height="61" rx="30.5" fill="#0b0c14" stroke="url(#spectrum)" stroke-width="3"/>
+    <circle cx="34" cy="32" r="20" fill="url(#orb)"/>
+    <g transform="translate(25 23) scale(0.75)" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></g>
+    <text x="66" y="29" fill="#f5f6fa" font-size="17" font-weight="700">Download Eagle 1.0.6</text>
+    <text x="66" y="47" fill="#9aa0b4" font-size="12" font-weight="500" letter-spacing="0.4">IPA · build 95</text>
+    <path d="m306 25 7 7-7 7" fill="none" stroke="#9aa0b4" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>

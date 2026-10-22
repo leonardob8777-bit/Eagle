@@ -12,24 +12,27 @@
   supported Wallet cards, Home Screen elements, Dynamic Island and Dock lighting
   from one app. Private system operations require careful compatibility checks.
 
-  [![Latest release](docs/badges/release.svg)](https://github.com/leonardob8777-bit/Eagle/releases/latest)
-  [![Total IPA downloads](docs/badges/downloads.svg)](https://github.com/leonardob8777-bit/Eagle/releases)
-  [![GitHub stars](docs/badges/stars.svg)](https://github.com/leonardob8777-bit/Eagle/stargazers)
-  [![AGPL-3.0](docs/badges/license.svg)](LICENSE)
+  <!-- eagle-stats:start -->
+  <a href="https://github.com/leonardob8777-bit/Eagle/releases">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/badges/stats-dark.svg">
+      <img src="docs/badges/stats-light.svg" alt="Eagle v1.0.6: 2,156 IPA downloads, 64 GitHub stars, AGPL-3.0 license" width="560">
+    </picture>
+  </a>
 
-  <sub>Counts checked October 16, 2026, 21:15 UTC. Open Releases or Stars for current totals. Downloads count IPA files only.</sub>
-
-  <br>
+  <br><br>
 
   <a href="https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.6/Eagle-1.0.6-95.ipa">
-    <img src="docs/badges/download.svg" alt="Download Eagle 1.0.6 IPA" height="40">
+    <img src="docs/badges/download.svg" alt="Download Eagle 1.0.6 IPA" width="340">
   </a>
 
   <br><br>
 
   [Release notes](https://github.com/leonardob8777-bit/Eagle/releases/tag/v1.0.6)
+  · [Star Eagle](https://github.com/leonardob8777-bit/Eagle/stargazers)
   · [Report a bug](https://github.com/leonardob8777-bit/Eagle/issues/new?template=bug_report.md)
   · [Request a feature](https://github.com/leonardob8777-bit/Eagle/issues/new?template=feature_request.md)
+  <!-- eagle-stats:end -->
 
   <sub>Sign the IPA with your usual personal-device installation method.</sub>
 </div>
@@ -94,7 +97,7 @@ Read the [complete release notes](docs/releases/v1.0.6.md), including verificati
 
 ## Install Eagle
 
-1. Use the large **Download Eagle.ipa** button at the top of this page.
+1. Use the **Download Eagle** button at the top of this page.
 2. Sign the IPA with your preferred personal-device sideloading method.
 3. Install it and open Eagle manually from the Home Screen.
 4. If you installed through Xcode, press **Stop** before preparing Eagle access.
