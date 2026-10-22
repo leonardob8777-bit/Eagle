@@ -1,0 +1,51 @@
+name: Refresh README counters
+
+on:
+  schedule:
+    - cron: '2,17,32,47 * * * *'
+  workflow_dispatch:
+  watch:
+    types: [started]
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/readme-stats.yml'
+      - 'scripts/update_readme_stats.py'
+      - 'scripts/test_readme_stats.py'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: readme-counters
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.repository == 'leonardob8777-bit/Eagle'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+      - name: Check counter handling
+        run: python3 scripts/test_readme_stats.py
+      - name: Read GitHub counters
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/update_readme_stats.py
+      - name: Publish changed counters
+        run: |
+          git add README.md docs/badges/downloads.svg docs/badges/stars.svg docs/badges/stats.json
+          if git diff --cached --quiet; then
+            echo 'Counters unchanged.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs: refresh IPA download and star counters'
+          git pull --rebase origin main
+          git push origin HEAD:main

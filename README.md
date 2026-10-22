@@ -13,11 +13,11 @@
   from one app. Private system operations require careful compatibility checks.
 
   [![Latest release](docs/badges/release.svg)](https://github.com/leonardob8777-bit/Eagle/releases/latest)
-  [![Total IPA downloads](docs/badges/downloads.svg)](https://github.com/leonardob8777-bit/Eagle/releases)
-  [![GitHub stars](docs/badges/stars.svg)](https://github.com/leonardob8777-bit/Eagle/stargazers)
+  [![Total IPA downloads](docs/badges/downloads.svg?v=2154)](https://github.com/leonardob8777-bit/Eagle/releases)
+  [![GitHub stars](docs/badges/stars.svg?v=64)](https://github.com/leonardob8777-bit/Eagle/stargazers)
   [![AGPL-3.0](docs/badges/license.svg)](LICENSE)
 
-  <sub>Counts checked October 16, 2026, 21:15 UTC. Open Releases or Stars for current totals. Downloads count IPA files only.</sub>
+  <sub>IPA downloads and stars refresh automatically about every 15 minutes. Last change: 2026-10-22 05:34 UTC. Counts include IPA files only.</sub>
 
   <br>
 
