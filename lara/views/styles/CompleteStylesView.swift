@@ -2334,11 +2334,6 @@ struct CompleteStylesView: View {
     @State private var confirmRestore = false
     @State private var notificationDetails: CompleteStyleRunResult?
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 22) {
@@ -2433,33 +2428,8 @@ struct CompleteStylesView: View {
                 }
                 .buttonStyle(StylePressableCard())
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Colección Eagle")
-                        .font(.title3.bold())
-                    Text("Seis estilos completos. Ningún ajuste innecesario.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                // Reads over the dark top of the backdrop too, when it scrolls up there.
-                .eagleBackdropText()
-                .padding(.top, 2)
-
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(CompleteStylePack.all) { pack in
-                        NavigationLink {
-                            CompleteStyleDetailView(pack: pack)
-                        } label: {
-                            CompleteStyleCard(
-                                pack: pack,
-                                isActive: manager.activePackID == pack.id
-                            )
-                        }
-                        .buttonStyle(StylePressableCard())
-                    }
-                }
-
                 NavigationLink {
-                    CompleteStyleMixerView()
+                    CompleteStyleCreateHubView()
                 } label: {
                     HStack(spacing: 13) {
                         Image(systemName: "wand.and.sparkles")
@@ -2472,7 +2442,7 @@ struct CompleteStylesView: View {
                             Text("Crear algo propio")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
-                            Text("Mezcla fondo, código y tarjeta")
+                            Text("Crea fondos, números y tarjetas con tus recursos")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -2494,7 +2464,18 @@ struct CompleteStylesView: View {
                 }
                 .buttonStyle(StylePressableCard())
 
-                Text("Los fondos y números provienen de la colección abierta de Nugget Wallpapers. Los diseños de tarjeta se generan en el dispositivo y Eagle conserva los originales.")
+                if manager.hasActiveStyle || manager.canUndo {
+                    Button {
+                        confirmRestore = true
+                    } label: {
+                        Label("Restaurar originales", systemImage: "arrow.uturn.backward.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(EagleSecondaryButtonStyle())
+                    .disabled(manager.isWorking || !mgr.sbxready)
+                }
+
+                Text("La colección de combinaciones preparadas se actualizará con diseños de Eagle. Puedes seguir creando y restaurando tus cambios.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2538,9 +2519,9 @@ struct CompleteStylesView: View {
 
     private var intro: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Un aspecto completo, en un toque")
+            Text("Crea tu propio estilo")
                 .font(.title2.bold())
-            Text("Elige una dirección visual. Eagle coordina el fondo, el código y la tarjeta, y te muestra el resultado de cada parte.")
+            Text("Usa una foto con Eagle Composer o edita el fondo, los números y la tarjeta por separado.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -2601,6 +2582,57 @@ struct CompleteStylesView: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(pack.secondary.color.opacity(0.18), lineWidth: 1)
         }
+    }
+}
+
+private struct CompleteStyleCreateHubView: View {
+    @ObservedObject private var mgr = laramgr.shared
+
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    LaraMatchView()
+                } label: {
+                    Label(
+                        LaraL10n.text(en: "Create from a photo", es: "Crear desde una foto"),
+                        systemImage: "camera.filters"
+                    )
+                }
+                NavigationLink {
+                    AnimatedWallpapersView()
+                } label: {
+                    Label(
+                        LaraL10n.text(en: "Create a wallpaper", es: "Crear un fondo"),
+                        systemImage: "photo.on.rectangle.angled"
+                    )
+                }
+                NavigationLink {
+                    PasscodeView(mgr: mgr)
+                } label: {
+                    Label(
+                        LaraL10n.text(en: "Edit passcode digits", es: "Editar números del código"),
+                        systemImage: "circle.grid.3x3.fill"
+                    )
+                }
+                NavigationLink {
+                    CardView()
+                } label: {
+                    Label(
+                        LaraL10n.text(en: "Create a card design", es: "Crear una tarjeta"),
+                        systemImage: "creditcard.fill"
+                    )
+                }
+            } header: {
+                Text(LaraL10n.text(en: "Create with your own assets", es: "Crea con tus recursos"))
+            } footer: {
+                Text(LaraL10n.text(
+                    en: "Eagle saves originals before applying supported changes.",
+                    es: "Eagle guarda los originales antes de aplicar los cambios compatibles."
+                ))
+            }
+        }
+        .navigationTitle(LaraL10n.text(en: "Create", es: "Crear"))
     }
 }
 

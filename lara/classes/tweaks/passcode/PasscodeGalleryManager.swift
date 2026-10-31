@@ -16,12 +16,20 @@ struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
     let id: String
     let name: String
     let description: String
-    let url: String
+    let url: String?
     let preview: String
-    let sha256: String
-    let byteCount: Int
+    let sha256: String?
+    let byteCount: Int?
+    let demoURL: String?
+    let demoSha256: String?
+    let demoByteCount: Int?
     let authors: String?
     let version: String?
+
+    var canInstall: Bool { url != nil && sha256 != nil && byteCount != nil }
+    var hasAnimatedPreview: Bool {
+        demoURL != nil && demoSha256 != nil && demoByteCount != nil
+    }
 
     var authorLine: String {
         if let authors, !authors.isEmpty { return authors }
@@ -29,7 +37,8 @@ struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, description, url, preview, sha256, byteCount, authors, version
+        case id, name, description, url, preview, sha256, byteCount
+        case demoURL, demoSha256, demoByteCount, authors, version
     }
 
     init(from decoder: Decoder) throws {
@@ -37,10 +46,13 @@ struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
-        url = try container.decode(String.self, forKey: .url)
+        url = try container.decodeIfPresent(String.self, forKey: .url)
         preview = try container.decode(String.self, forKey: .preview)
-        sha256 = try container.decode(String.self, forKey: .sha256)
-        byteCount = try container.decode(Int.self, forKey: .byteCount)
+        sha256 = try container.decodeIfPresent(String.self, forKey: .sha256)
+        byteCount = try container.decodeIfPresent(Int.self, forKey: .byteCount)
+        demoURL = try container.decodeIfPresent(String.self, forKey: .demoURL)
+        demoSha256 = try container.decodeIfPresent(String.self, forKey: .demoSha256)
+        demoByteCount = try container.decodeIfPresent(Int.self, forKey: .demoByteCount)
         authors = try container.decodeIfPresent(String.self, forKey: .authors)
         version = try container.decodeIfPresent(String.self, forKey: .version)
     }
@@ -84,9 +96,30 @@ final class PasscodeGalleryManager: ObservableObject {
     }
 
     func downloadURL(for theme: PasscodeGalleryTheme) -> URL? {
+        guard let package = theme.url else { return nil }
         guard let repoData = repos.first(where: { $0.data?.themes.contains(where: { $0.id == theme.id }) == true })?.data else { return nil }
-        if theme.url.hasPrefix("http") { return URL(string: theme.url) }
-        return repoData.baseURL.appendingPathComponent(theme.url)
+        return URL(string: package, relativeTo: repoData.baseURL)?.absoluteURL
+    }
+
+    func animatedPreviewHTML(for theme: PasscodeGalleryTheme) async throws -> String {
+        guard let rawURL = theme.demoURL,
+              let expectedBytes = theme.demoByteCount,
+              let expectedSHA = theme.demoSha256,
+              let url = URL(string: rawURL), url.scheme == "https",
+              url.host == "raw.githubusercontent.com",
+              url.path.hasPrefix("/leonardob8777-bit/Eagle-Gallery/main/passcode/live/") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 30
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              data.count == expectedBytes, data.count <= 512 * 1024,
+              Data(SHA256.hash(data: data)).map({ String(format: "%02x", $0) }).joined() == expectedSHA.lowercased(),
+              let html = String(data: data, encoding: .utf8) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return html
     }
 
     func isDownloading(_ theme: PasscodeGalleryTheme) -> Bool { downloading.contains(theme.id) }
@@ -123,16 +156,18 @@ final class PasscodeGalleryManager: ObservableObject {
     }
 
     func downloadAndImport(_ theme: PasscodeGalleryTheme) async throws -> URL {
-        guard let fileURL = downloadURL(for: theme) else { throw URLError(.badURL) }
+        guard let fileURL = downloadURL(for: theme),
+              let expectedBytes = theme.byteCount,
+              let expectedSHA = theme.sha256 else { throw URLError(.badURL) }
         downloading.insert(theme.id)
         defer { downloading.remove(theme.id) }
         let (data, response) = try await URLSession.shared.data(from: fileURL)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
-        guard data.count == theme.byteCount,
+        guard data.count == expectedBytes,
               data.count <= 50 * 1024 * 1024,
-              Data(SHA256.hash(data: data)).map({ String(format: "%02x", $0) }).joined() == theme.sha256.lowercased() else {
+              Data(SHA256.hash(data: data)).map({ String(format: "%02x", $0) }).joined() == expectedSHA.lowercased() else {
             throw CocoaError(.fileReadCorruptFile)
         }
         let dest = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -161,12 +196,36 @@ final class PasscodeGalleryManager: ObservableObject {
         guard parsed.schemaVersion == 1, parsed.themes.count <= 1000,
               Set(parsed.themes.map(\.id)).count == parsed.themes.count,
               parsed.themes.allSatisfy({ theme in
-                  !theme.id.isEmpty &&
-                  theme.id.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0) }) &&
-                  theme.byteCount > 0 && theme.byteCount <= 50 * 1024 * 1024 &&
-                  theme.sha256.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil &&
-                  URL(string: theme.url, relativeTo: baseURL)?.absoluteURL.scheme == "https" &&
-                  URL(string: theme.preview, relativeTo: baseURL)?.absoluteURL.scheme == "https"
+                  let idValid = !theme.id.isEmpty &&
+                      theme.id.unicodeScalars.allSatisfy({
+                          CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0)
+                      })
+                  let previewValid = URL(string: theme.preview, relativeTo: baseURL)?.absoluteURL.scheme == "https"
+                  let packageValid: Bool
+                  if let package = theme.url,
+                     let digest = theme.sha256,
+                     let size = theme.byteCount {
+                      packageValid = size > 0 && size <= 50 * 1024 * 1024 &&
+                          digest.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil &&
+                          URL(string: package, relativeTo: baseURL)?.absoluteURL.scheme == "https"
+                  } else {
+                      packageValid = theme.url == nil && theme.sha256 == nil && theme.byteCount == nil
+                  }
+                  let demoValid: Bool
+                  if let demo = theme.demoURL,
+                     let digest = theme.demoSha256,
+                     let size = theme.demoByteCount,
+                     let demoURL = URL(string: demo) {
+                      demoValid = size > 0 && size <= 512 * 1024 &&
+                          digest.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil &&
+                          demoURL.scheme == "https" &&
+                          demoURL.host == "raw.githubusercontent.com" &&
+                          demoURL.path.hasPrefix("/leonardob8777-bit/Eagle-Gallery/main/passcode/live/")
+                  } else {
+                      demoValid = theme.demoURL == nil && theme.demoSha256 == nil && theme.demoByteCount == nil
+                  }
+                  return idValid && previewValid && packageValid && demoValid &&
+                      (theme.canInstall || theme.hasAnimatedPreview)
               }) else { throw CocoaError(.fileReadCorruptFile) }
         return PasscodeRepoData(name: parsed.repo_name, author: parsed.repo_author, icon: parsed.repo_icon, themes: parsed.themes, baseURL: baseURL)
     }

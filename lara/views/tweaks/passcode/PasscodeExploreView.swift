@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WebKit
 
 private enum EaglePasscodeFavorites {
     static let storageKey = "eagle.passcode.favoriteThemeIDs"
@@ -37,6 +38,7 @@ struct PasscodeExploreView: View {
     @State private var searchTerm = ""
     @State private var showsFavoritesOnly = false
     @State private var alertMessage: String?
+    @State private var previewTheme: PasscodeGalleryTheme?
     var onImport: ((URL) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     
@@ -99,8 +101,10 @@ struct PasscodeExploreView: View {
                                 previewURL: gallery.previewURL(for: theme),
                                 isDownloading: gallery.isDownloading(theme),
                                 isFavorite: favoriteIDs.contains(theme.id),
-                                onToggleFavorite: { toggleFavorite(theme) }
-                            ) { Task { await handleDownload(theme) } }
+                                onToggleFavorite: { toggleFavorite(theme) },
+                                onPreview: { previewTheme = theme },
+                                onDownload: { Task { await handleDownload(theme) } }
+                            )
                         }
                     }
                 }
@@ -133,6 +137,9 @@ struct PasscodeExploreView: View {
             }
         }
         .eagleStatus($alertMessage, title: LaraL10n.text(en: "Passcode styles", es: "Estilos del código"))
+        .sheet(item: $previewTheme) { theme in
+            AnimatedPasscodePreviewView(theme: theme, gallery: gallery)
+        }
     }
 
     private var emptyTitle: String {
@@ -208,6 +215,7 @@ private struct PasscodeGalleryCard: View {
     let isDownloading: Bool
     let isFavorite: Bool
     let onToggleFavorite: () -> Void
+    let onPreview: () -> Void
     let onDownload: () -> Void
 
     var body: some View {
@@ -252,18 +260,39 @@ private struct PasscodeGalleryCard: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Button(action: onDownload) {
-                    HStack {
-                        if isDownloading { ProgressView().controlSize(.small).tint(Color(uiColor: .systemBackground)) } else { Image(systemName: "arrow.down.circle") }
-                        Text(LaraL10n.text(en: "Use style", es: "Usar estilo"))
+                if theme.hasAnimatedPreview {
+                    Button(action: onPreview) {
+                        Label(
+                            LaraL10n.text(en: "View animation", es: "Ver animación"),
+                            systemImage: "play.circle.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .buttonStyle(.borderedProminent)
+                    .eagleProminentLabel()
                 }
-                .buttonStyle(.borderedProminent)
-                // The contrasting colour on the black/white fill, grey while disabled.
-                .eagleProminentLabel()
-                .disabled(isDownloading)
+
+                if theme.canInstall {
+                    Button(action: onDownload) {
+                        HStack {
+                            if isDownloading { ProgressView().controlSize(.small).tint(Color(uiColor: .systemBackground)) } else { Image(systemName: "arrow.down.circle") }
+                            Text(LaraL10n.text(en: "Use style", es: "Usar estilo"))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .eagleProminentLabel()
+                    .disabled(isDownloading)
+                } else {
+                    Text(LaraL10n.text(
+                        en: "Animated preview only · not available on the lock screen",
+                        es: "Solo vista animada · no disponible en la pantalla de bloqueo"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
             .padding()
         }
@@ -275,4 +304,94 @@ private struct PasscodeGalleryCard: View {
         }
     }
 
+}
+
+private struct AnimatedPasscodePreviewView: View {
+    let theme: PasscodeGalleryTheme
+    @ObservedObject var gallery: PasscodeGalleryManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var html: String?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                Group {
+                    if let html {
+                        EaglePasscodeHTMLPreview(html: html)
+                    } else if let errorMessage {
+                        VStack(spacing: 12) {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .multilineTextAlignment(.center)
+                            Button(LaraL10n.text(en: "Try again", es: "Intentar de nuevo")) {
+                                Task { await load() }
+                            }
+                        }
+                        .padding()
+                    } else {
+                        ProgressView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.black)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                Text(LaraL10n.text(
+                    en: "This animation runs in Eagle only. Applying it to the iOS lock screen is still in development.",
+                    es: "Esta animación funciona solo en Eagle. Aplicarla a la pantalla de bloqueo de iOS sigue en desarrollo."
+                ))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            }
+            .padding(16)
+            .navigationTitle(theme.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(LaraL10n.text(en: "Close", es: "Cerrar")) { dismiss() }
+                }
+            }
+            .task { await load() }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func load() async {
+        html = nil
+        errorMessage = nil
+        do {
+            html = try await gallery.animatedPreviewHTML(for: theme)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct EaglePasscodeHTMLPreview: UIViewRepresentable {
+    let html: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let web = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        web.isOpaque = false
+        web.backgroundColor = .black
+        web.scrollView.isScrollEnabled = false
+        web.scrollView.bounces = false
+        web.allowsLinkPreview = false
+        web.isUserInteractionEnabled = false
+        return web
+    }
+
+    func updateUIView(_ web: WKWebView, context: Context) {
+        guard context.coordinator.loadedHTML != html else { return }
+        context.coordinator.loadedHTML = html
+        web.loadHTMLString(html, baseURL: nil)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var loadedHTML: String?
+    }
 }
