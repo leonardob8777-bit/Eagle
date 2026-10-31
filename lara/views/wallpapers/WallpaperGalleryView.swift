@@ -563,6 +563,8 @@ private struct EagleWallpaperDetail: View {
     @ObservedObject private var mgr = laramgr.shared
     @AppStorage(EagleWallpaperFavorites.storageKey)
     private var favoriteIDsJSON = "[]"
+    @State private var isPreparingDownload = false
+    @State private var shareImage: EagleWallpaperShareImage?
 
     private var isInstalling: Bool {
         gallery.installingID == wallpaper.id
@@ -633,6 +635,20 @@ private struct EagleWallpaperDetail: View {
                 ))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                Button {
+                    Task { await downloadImageForSharing() }
+                } label: {
+                    Label(
+                        isPreparingDownload
+                            ? LaraL10n.text(en: "Downloading image…", es: "Descargando imagen…")
+                            : LaraL10n.text(en: "Save or share image", es: "Guardar o compartir imagen"),
+                        systemImage: "square.and.arrow.down"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(EagleSecondaryButtonStyle())
+                .disabled(isPreparingDownload)
             }
             .padding(20)
             .padding(.bottom, 24)
@@ -690,7 +706,62 @@ private struct EagleWallpaperDetail: View {
                 action: installed ? { gallery.openWallpaperPicker() } : nil)
             gallery.clearResult()
         }
+        .sheet(item: $shareImage) { item in
+            EagleWallpaperShareSheet(url: item.url)
+        }
     }
+
+    @MainActor
+    private func downloadImageForSharing() async {
+        guard !isPreparingDownload else { return }
+        isPreparingDownload = true
+        defer { isPreparingDownload = false }
+        do {
+            guard let url = wallpaper.previewURL,
+                  url.scheme == "https",
+                  url.host == "raw.githubusercontent.com",
+                  url.path.hasPrefix("/leonardob8777-bit/Eagle-Gallery/main/previews/wallpapers/") else {
+                throw URLError(.badURL)
+            }
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 30
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  http.statusCode == 200,
+                  data.count <= 20 * 1024 * 1024,
+                  data.starts(with: [0x89, 0x50, 0x4E, 0x47]),
+                  UIImage(data: data) != nil else {
+                throw EagleWallpaperError.invalidResponse
+            }
+            let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Eagle Wallpapers", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let destination = directory.appendingPathComponent(wallpaper.id + ".png")
+            try data.write(to: destination, options: .atomic)
+            shareImage = EagleWallpaperShareImage(url: destination)
+        } catch {
+            EagleNotifications.shared.show(
+                title: LaraL10n.text(en: "Wallpapers", es: "Fondos"),
+                message: error.localizedDescription,
+                kind: .error
+            )
+        }
+    }
+}
+
+private struct EagleWallpaperShareImage: Identifiable {
+    let url: URL
+    var id: URL { url }
+}
+
+private struct EagleWallpaperShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 nonisolated struct TendiesInstallResult: Sendable {
