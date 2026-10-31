@@ -293,6 +293,20 @@ private struct PasscodeGalleryCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
+
+                if let wallpaperID = theme.wallpaperID {
+                    NavigationLink {
+                        WallpaperGalleryView(matchingWallpaperID: wallpaperID)
+                    } label: {
+                        Label(
+                            LaraL10n.text(en: "Matching wallpaper", es: "Fondo a juego"),
+                            systemImage: "photo.on.rectangle"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
             .padding()
         }

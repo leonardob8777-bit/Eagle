@@ -279,6 +279,7 @@ final class WallpaperCatalogManager: ObservableObject {
 }
 
 struct WallpaperGalleryView: View {
+    let matchingWallpaperID: String?
     @ObservedObject private var gallery = WallpaperCatalogManager.shared
     @ObservedObject private var mgr = laramgr.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -289,6 +290,10 @@ struct WallpaperGalleryView: View {
 
     @State private var searchText = ""
     @State private var showsFavoritesOnly = false
+
+    init(matchingWallpaperID: String? = nil) {
+        self.matchingWallpaperID = matchingWallpaperID
+    }
 
     private var columns: [GridItem] {
         if dynamicTypeSize.isAccessibilitySize {
@@ -305,6 +310,9 @@ struct WallpaperGalleryView: View {
 
     private var displayedItems: [EagleWallpaper] {
         var items = gallery.wallpapers.filter(\.isCompatibleWithCurrentIOS)
+        if let matchingWallpaperID {
+            items = items.filter { $0.id == matchingWallpaperID }
+        }
         if showsFavoritesOnly {
             let favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
             items = items.filter { favoriteIDs.contains($0.id) }

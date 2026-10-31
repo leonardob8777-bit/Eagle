@@ -23,6 +23,7 @@ struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
     let demoURL: String?
     let demoSha256: String?
     let demoByteCount: Int?
+    let wallpaperID: String?
     let authors: String?
     let version: String?
 
@@ -38,7 +39,7 @@ struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, description, url, preview, sha256, byteCount
-        case demoURL, demoSha256, demoByteCount, authors, version
+        case demoURL, demoSha256, demoByteCount, wallpaperID, authors, version
     }
 
     init(from decoder: Decoder) throws {
@@ -53,6 +54,7 @@ struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
         demoURL = try container.decodeIfPresent(String.self, forKey: .demoURL)
         demoSha256 = try container.decodeIfPresent(String.self, forKey: .demoSha256)
         demoByteCount = try container.decodeIfPresent(Int.self, forKey: .demoByteCount)
+        wallpaperID = try container.decodeIfPresent(String.self, forKey: .wallpaperID)
         authors = try container.decodeIfPresent(String.self, forKey: .authors)
         version = try container.decodeIfPresent(String.self, forKey: .version)
     }
@@ -224,7 +226,12 @@ final class PasscodeGalleryManager: ObservableObject {
                   } else {
                       demoValid = theme.demoURL == nil && theme.demoSha256 == nil && theme.demoByteCount == nil
                   }
-                  return idValid && previewValid && packageValid && demoValid &&
+                  let wallpaperValid = theme.wallpaperID.map { value in
+                      !value.isEmpty && value.unicodeScalars.allSatisfy({
+                          CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0)
+                      })
+                  } ?? true
+                  return idValid && previewValid && packageValid && demoValid && wallpaperValid &&
                       (theme.canInstall || theme.hasAnimatedPreview)
               }) else { throw CocoaError(.fileReadCorruptFile) }
         return PasscodeRepoData(name: parsed.repo_name, author: parsed.repo_author, icon: parsed.repo_icon, themes: parsed.themes, baseURL: baseURL)
