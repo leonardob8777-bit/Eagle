@@ -42,10 +42,7 @@ struct PasscodeExploreView: View {
     
     private func handleDownload(_ theme: PasscodeGalleryTheme) async {
         do {
-            try await gallery.downloadAndImport(theme)
-            let dest = FileManager.default
-                .urls(for: .documentDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent(theme.name + ".passthm")
+            let dest = try await gallery.downloadAndImport(theme)
             onImport?(dest)
             dismiss()
         } catch { alertMessage = error.localizedDescription }
@@ -108,19 +105,11 @@ struct PasscodeExploreView: View {
                     }
                 }
 
-                Link(
-                    LaraL10n.text(
-                        en: "Official Nugget collection",
-                        es: "Colección oficial de Nugget"
-                    ),
-                    destination: URL(string: "https://github.com/SerStars/Nugget-Wallpapers")!
-                )
-                .font(.footnote.weight(.medium))
             }
             .padding(16)
         }
         .eagleScreenBackdrop()
-        .navigationTitle(LaraL10n.text(en: "Explore styles", es: "Explorar estilos"))
+        .navigationTitle(LaraL10n.text(en: "Eagle passcode styles", es: "Estilos de código Eagle"))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
             text: $searchTerm,
@@ -152,7 +141,9 @@ struct PasscodeExploreView: View {
                 ? LaraL10n.text(en: "No favorite styles yet", es: "Todavía no hay estilos favoritos")
                 : LaraL10n.text(en: "No matching favorites", es: "No hay favoritos coincidentes")
         }
-        return LaraL10n.text(en: "No styles found", es: "No encontramos estilos")
+        return searchTerm.isEmpty
+            ? LaraL10n.text(en: "Eagle styles are coming soon", es: "Pronto habrá estilos Eagle")
+            : LaraL10n.text(en: "No styles found", es: "No encontramos estilos")
     }
 
     private var emptyMessage: String {
@@ -162,10 +153,9 @@ struct PasscodeExploreView: View {
                 es: "Toca el corazón de un estilo para guardarlo aquí."
             )
         }
-        return LaraL10n.text(
-            en: "Try another name or creator.",
-            es: "Prueba con otro nombre o creador."
-        )
+        return searchTerm.isEmpty
+            ? LaraL10n.text(en: "New styles will appear here when published.", es: "Los estilos nuevos aparecerán aquí al publicarse.")
+            : LaraL10n.text(en: "Try another name or creator.", es: "Prueba con otro nombre o creador.")
     }
 
     private func toggleFavorite(_ theme: PasscodeGalleryTheme) {

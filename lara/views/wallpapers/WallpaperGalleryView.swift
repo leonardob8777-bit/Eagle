@@ -1,57 +1,62 @@
 import SwiftUI
 import Combine
+import CryptoKit
 
-private let nuggetWallpaperBaseURL = URL(
-    string: "https://raw.githubusercontent.com/SerStars/Nugget-Wallpapers/main/"
+private let eagleGalleryBaseURL = URL(
+    string: "https://raw.githubusercontent.com/leonardob8777-bit/Eagle-Gallery/main/"
 )!
 
-enum WallpaperCatalogKind: String, CaseIterable, Identifiable {
-    case community
-    case apple
+private let eagleWallpaperCatalogURL = eagleGalleryBaseURL
+    .appendingPathComponent("catalogs/wallpaper-v1.json")
 
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .community: return LaraL10n.text(en: "Community", es: "Comunidad")
-        case .apple: return "Apple"
-        }
-    }
-
-    var manifestURL: URL {
-        let name = self == .community ? "wallpapers-custom.json" : "wallpapers-apple.json"
-        return nuggetWallpaperBaseURL.appendingPathComponent(name)
-    }
-}
-
-struct NuggetWallpaper: Decodable, Identifiable, Hashable {
+struct EagleWallpaper: Decodable, Identifiable, Hashable {
+    let id: String
     let name: String
     let description: String?
     let url: String
     let preview: String
+    let sha256: String
+    let byteCount: Int
+    let minimumIOSMajor: Int
     let authors: String?
     let contest: String?
 
-    var id: String { url }
+    private enum CodingKeys: String, CodingKey {
+        case id, name, description, url, preview, sha256, byteCount
+        case minimumIOSMajor, authors, contest
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        url = try container.decode(String.self, forKey: .url)
+        preview = try container.decode(String.self, forKey: .preview)
+        sha256 = try container.decode(String.self, forKey: .sha256)
+        byteCount = try container.decode(Int.self, forKey: .byteCount)
+        minimumIOSMajor = try container.decodeIfPresent(Int.self, forKey: .minimumIOSMajor) ?? 17
+        authors = try container.decodeIfPresent(String.self, forKey: .authors)
+        contest = try container.decodeIfPresent(String.self, forKey: .contest)
+    }
 
     var authorLine: String {
         guard let authors, !authors.isEmpty else {
-            return LaraL10n.text(en: "Nugget collection", es: "Colección de Nugget")
+            return "Eagle"
         }
         return authors
     }
 
-    var requiresIOS26: Bool {
-        let details = "\(name) \(description ?? "") \(contest ?? "")".lowercased()
-        return details.contains("ios 26")
+    var isCompatibleWithCurrentIOS: Bool {
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= minimumIOSMajor
     }
 
     var previewURL: URL? {
-        URL(string: preview, relativeTo: nuggetWallpaperBaseURL)?.absoluteURL
+        URL(string: preview, relativeTo: eagleGalleryBaseURL)?.absoluteURL
     }
 
     var downloadURL: URL? {
-        URL(string: url, relativeTo: nuggetWallpaperBaseURL)?.absoluteURL
+        URL(string: url, relativeTo: eagleGalleryBaseURL)?.absoluteURL
     }
 }
 
@@ -75,13 +80,14 @@ private enum EagleWallpaperFavorites {
     }
 }
 
-enum CommunityWallpaperError: LocalizedError {
+enum EagleWallpaperError: LocalizedError {
     case invalidResponse
     case invalidPackage
     case packageTooLarge
+    case packageIntegrity
     case noDescriptors
     case tooManyDescriptors
-    case requiresIOS26
+    case requiresIOS(Int)
     case unsupportedExtension
 
     var errorDescription: String? {
@@ -101,6 +107,11 @@ enum CommunityWallpaperError: LocalizedError {
                 en: "This file is too large to process safely on your iPhone.",
                 es: "El archivo supera el límite seguro de tamaño para procesarlo en el iPhone."
             )
+        case .packageIntegrity:
+            return LaraL10n.text(
+                en: "The downloaded wallpaper does not match the published package.",
+                es: "El fondo descargado no coincide con el paquete publicado."
+            )
         case .noDescriptors:
             return LaraL10n.text(
                 en: "This package does not contain a wallpaper Eagle can install.",
@@ -111,10 +122,10 @@ enum CommunityWallpaperError: LocalizedError {
                 en: "This package contains too many wallpapers for one installation.",
                 es: "El paquete contiene demasiados fondos para una sola instalación."
             )
-        case .requiresIOS26:
+        case .requiresIOS(let major):
             return LaraL10n.text(
-                en: "This wallpaper requires iOS 26 because of the animations it uses.",
-                es: "Este fondo requiere iOS 26 por las animaciones que utiliza."
+                en: "This wallpaper requires iOS \(major).",
+                es: "Este fondo requiere iOS \(major)."
             )
         case .unsupportedExtension:
             return LaraL10n.text(
@@ -125,9 +136,9 @@ enum CommunityWallpaperError: LocalizedError {
     }
 }
 
-private enum NuggetWallpaperService {
-    static func fetch(_ kind: WallpaperCatalogKind, forceRefresh: Bool) async throws -> [NuggetWallpaper] {
-        var request = URLRequest(url: kind.manifestURL)
+private enum EagleWallpaperService {
+    static func fetch(forceRefresh: Bool) async throws -> [EagleWallpaper] {
+        var request = URLRequest(url: eagleWallpaperCatalogURL)
         request.timeoutInterval = 30
         if forceRefresh {
             request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -135,21 +146,40 @@ private enum NuggetWallpaperService {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw CommunityWallpaperError.invalidResponse
+            throw EagleWallpaperError.invalidResponse
         }
-        return try JSONDecoder().decode([NuggetWallpaper].self, from: data)
+        guard data.count <= 1024 * 1024 else { throw EagleWallpaperError.invalidResponse }
+        struct Manifest: Decodable {
+            let schemaVersion: Int
+            let wallpapers: [EagleWallpaper]
+        }
+        let manifest = try JSONDecoder().decode(Manifest.self, from: data)
+        guard manifest.schemaVersion == 1,
+              manifest.wallpapers.count <= 1000,
+              Set(manifest.wallpapers.map(\.id)).count == manifest.wallpapers.count,
+              manifest.wallpapers.allSatisfy({ item in
+                  !item.id.isEmpty &&
+                  item.id.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0) }) &&
+                  item.byteCount > 0 && item.byteCount <= TendiesInstaller.maximumCompressedSize &&
+                  (16...26).contains(item.minimumIOSMajor) &&
+                  item.sha256.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil &&
+                  item.downloadURL?.scheme == "https" && item.previewURL?.scheme == "https"
+              }) else { throw EagleWallpaperError.invalidResponse }
+        return manifest.wallpapers
     }
 
-    static func download(_ wallpaper: NuggetWallpaper) async throws -> Data {
+    static func download(_ wallpaper: EagleWallpaper) async throws -> Data {
         guard let url = wallpaper.downloadURL else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
         request.timeoutInterval = 120
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw CommunityWallpaperError.invalidResponse
+            throw EagleWallpaperError.invalidResponse
         }
-        guard data.count <= TendiesInstaller.maximumCompressedSize else {
-            throw CommunityWallpaperError.packageTooLarge
+        guard data.count == wallpaper.byteCount,
+              data.count <= TendiesInstaller.maximumCompressedSize,
+              Data(SHA256.hash(data: data)).map({ String(format: "%02x", $0) }).joined() == wallpaper.sha256.lowercased() else {
+            throw EagleWallpaperError.packageIntegrity
         }
         return data
     }
@@ -159,17 +189,12 @@ private enum NuggetWallpaperService {
 final class WallpaperCatalogManager: ObservableObject {
     static let shared = WallpaperCatalogManager()
 
-    @Published private(set) var community: [NuggetWallpaper] = []
-    @Published private(set) var apple: [NuggetWallpaper] = []
+    @Published private(set) var wallpapers: [EagleWallpaper] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var installingID: String?
     @Published private(set) var resultMessage: String?
     @Published private(set) var didInstall = false
-
-    func items(for kind: WallpaperCatalogKind) -> [NuggetWallpaper] {
-        kind == .community ? community : apple
-    }
 
     func load(forceRefresh: Bool = false) async {
         guard !isLoading else { return }
@@ -177,18 +202,14 @@ final class WallpaperCatalogManager: ObservableObject {
         errorMessage = nil
 
         do {
-            async let communityItems = NuggetWallpaperService.fetch(.community, forceRefresh: forceRefresh)
-            async let appleItems = NuggetWallpaperService.fetch(.apple, forceRefresh: forceRefresh)
-            let loaded = try await (communityItems, appleItems)
-            community = loaded.0
-            apple = loaded.1
+            wallpapers = try await EagleWallpaperService.fetch(forceRefresh: forceRefresh)
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
-    func install(_ wallpaper: NuggetWallpaper) async {
+    func install(_ wallpaper: EagleWallpaper) async {
         guard installingID == nil else { return }
         guard laramgr.shared.sbxready else {
             resultMessage = LaraL10n.text(
@@ -197,9 +218,8 @@ final class WallpaperCatalogManager: ObservableObject {
             )
             return
         }
-        if wallpaper.requiresIOS26,
-           ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 26 {
-            resultMessage = CommunityWallpaperError.requiresIOS26.localizedDescription
+        if !wallpaper.isCompatibleWithCurrentIOS {
+            resultMessage = EagleWallpaperError.requiresIOS(wallpaper.minimumIOSMajor).localizedDescription
             return
         }
 
@@ -208,7 +228,7 @@ final class WallpaperCatalogManager: ObservableObject {
         didInstall = false
 
         do {
-            let data = try await NuggetWallpaperService.download(wallpaper)
+            let data = try await EagleWallpaperService.download(wallpaper)
             let result = try await Task.detached(priority: .userInitiated) {
                 try TendiesInstaller.install(data: data)
             }.value
@@ -267,8 +287,6 @@ struct WallpaperGalleryView: View {
     @AppStorage(EagleWallpaperFavorites.storageKey)
     private var favoriteIDsJSON = "[]"
 
-    @AppStorage("eagle.wallpapers.category")
-    private var category: WallpaperCatalogKind = .community
     @State private var searchText = ""
     @State private var showsFavoritesOnly = false
 
@@ -285,11 +303,8 @@ struct WallpaperGalleryView: View {
         return [GridItem(.adaptive(minimum: 170), spacing: 12)]
     }
 
-    private var displayedItems: [NuggetWallpaper] {
-        let currentMajorVersion = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
-        var items = gallery.items(for: category).filter {
-            currentMajorVersion >= 26 || !$0.requiresIOS26
-        }
+    private var displayedItems: [EagleWallpaper] {
+        var items = gallery.wallpapers.filter(\.isCompatibleWithCurrentIOS)
         if showsFavoritesOnly {
             let favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
             items = items.filter { favoriteIDs.contains($0.id) }
@@ -306,21 +321,14 @@ struct WallpaperGalleryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                Picker("Colección", selection: $category) {
-                    ForEach(WallpaperCatalogKind.allCases) { kind in
-                        Text(kind.title).tag(kind)
-                    }
-                }
-                .pickerStyle(.segmented)
-
                 if !mgr.sbxready {
                     LaraAccessView(compact: true)
                 }
 
-                if gallery.isLoading && gallery.items(for: category).isEmpty {
+                if gallery.isLoading && gallery.wallpapers.isEmpty {
                     loadingView
                 } else if let error = gallery.errorMessage,
-                          gallery.items(for: category).isEmpty {
+                          gallery.wallpapers.isEmpty {
                     errorView(error)
                 } else if displayedItems.isEmpty {
                     emptyView
@@ -330,9 +338,9 @@ struct WallpaperGalleryView: View {
                         ForEach(displayedItems) { wallpaper in
                             ZStack(alignment: .topTrailing) {
                                 NavigationLink {
-                                    CommunityWallpaperDetail(wallpaper: wallpaper)
+                                    EagleWallpaperDetail(wallpaper: wallpaper)
                                 } label: {
-                                    CommunityWallpaperCard(wallpaper: wallpaper)
+                                    EagleWallpaperCard(wallpaper: wallpaper)
                                 }
                                 .buttonStyle(EaglePressableStyle())
 
@@ -346,12 +354,6 @@ struct WallpaperGalleryView: View {
                     }
                 }
 
-                Link(
-                    "Catálogo oficial de Nugget Wallpapers",
-                    destination: URL(string: "https://github.com/SerStars/Nugget-Wallpapers")!
-                )
-                .font(.footnote.weight(.medium))
-                .padding(.vertical, 8)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 36)
@@ -362,7 +364,7 @@ struct WallpaperGalleryView: View {
         )
         .refreshable { await gallery.load(forceRefresh: true) }
         .task {
-            if gallery.community.isEmpty || gallery.apple.isEmpty {
+            if gallery.wallpapers.isEmpty {
                 await gallery.load()
             }
         }
@@ -383,7 +385,7 @@ struct WallpaperGalleryView: View {
         }
     }
 
-    private func toggleFavorite(_ wallpaper: NuggetWallpaper) {
+    private func toggleFavorite(_ wallpaper: EagleWallpaper) {
         var favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
         if !favoriteIDs.insert(wallpaper.id).inserted {
             favoriteIDs.remove(wallpaper.id)
@@ -393,7 +395,7 @@ struct WallpaperGalleryView: View {
     }
 
     private func favoriteButton(
-        for wallpaper: NuggetWallpaper,
+        for wallpaper: EagleWallpaper,
         favorite: Bool
     ) -> some View {
         return Button {
@@ -476,15 +478,17 @@ struct WallpaperGalleryView: View {
         if showsFavoritesOnly {
             return searchText.isEmpty
                 ? LaraL10n.text(
-                    en: "No favorites in this collection",
-                    es: "No hay favoritos en esta colección"
+                    en: "No favorite wallpapers yet",
+                    es: "Todavía no hay fondos favoritos"
                 )
                 : LaraL10n.text(
                     en: "No matching favorites",
                     es: "No hay favoritos coincidentes"
                 )
         }
-        return LaraL10n.text(en: "No results", es: "Sin resultados")
+        return searchText.isEmpty
+            ? LaraL10n.text(en: "Eagle wallpapers are coming soon", es: "Pronto habrá fondos Eagle")
+            : LaraL10n.text(en: "No results", es: "Sin resultados")
     }
 
     private var emptyMessage: String {
@@ -494,15 +498,14 @@ struct WallpaperGalleryView: View {
                 es: "Toca el corazón de un fondo para guardarlo aquí."
             )
         }
-        return LaraL10n.text(
-            en: "Try another name or creator.",
-            es: "Prueba con otro nombre o creador."
-        )
+        return searchText.isEmpty
+            ? LaraL10n.text(en: "New wallpapers will appear here when published.", es: "Los fondos nuevos aparecerán aquí al publicarse.")
+            : LaraL10n.text(en: "Try another name or creator.", es: "Prueba con otro nombre o creador.")
     }
 }
 
-private struct CommunityWallpaperCard: View {
-    let wallpaper: NuggetWallpaper
+private struct EagleWallpaperCard: View {
+    let wallpaper: EagleWallpaper
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -527,8 +530,8 @@ private struct CommunityWallpaperCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
-                if wallpaper.requiresIOS26 {
-                    Text("iOS 26")
+                if wallpaper.minimumIOSMajor >= 26 {
+                    Text("iOS \(wallpaper.minimumIOSMajor)")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.orange)
                 }
@@ -545,8 +548,8 @@ private struct CommunityWallpaperCard: View {
     }
 }
 
-private struct CommunityWallpaperDetail: View {
-    let wallpaper: NuggetWallpaper
+private struct EagleWallpaperDetail: View {
+    let wallpaper: EagleWallpaper
 
     @ObservedObject private var gallery = WallpaperCatalogManager.shared
     @ObservedObject private var mgr = laramgr.shared
@@ -558,7 +561,7 @@ private struct CommunityWallpaperDetail: View {
     }
 
     private var isIncompatible: Bool {
-        wallpaper.requiresIOS26 && ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 26
+        !wallpaper.isCompatibleWithCurrentIOS
     }
 
     private var isFavorite: Bool {
@@ -602,7 +605,13 @@ private struct CommunityWallpaperDetail: View {
                 }
 
                 if isIncompatible {
-                    Label("Requiere iOS 26", systemImage: "exclamationmark.triangle.fill")
+                    Label(
+                        LaraL10n.text(
+                            en: "Requires iOS \(wallpaper.minimumIOSMajor)",
+                            es: "Requiere iOS \(wallpaper.minimumIOSMajor)"
+                        ),
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.orange)
                         .padding(16)
@@ -610,7 +619,10 @@ private struct CommunityWallpaperDetail: View {
                         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
 
-                Text("Los fondos y sus vistas previas pertenecen a sus respectivos creadores. Eagle instala una copia local y no modifica otros fondos.")
+                Text(LaraL10n.text(
+                    en: "Eagle imports a local copy. Select it in Wallpapers after installation.",
+                    es: "Eagle importa una copia local. Selecciónala en Fondos después de instalarla."
+                ))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -691,7 +703,7 @@ nonisolated enum TendiesInstaller {
 
     static func install(data: Data) throws -> TendiesInstallResult {
         guard data.count <= maximumCompressedSize else {
-            throw CommunityWallpaperError.packageTooLarge
+            throw EagleWallpaperError.packageTooLarge
         }
 
         let archive = try ZipArchive(data: data)
@@ -701,7 +713,7 @@ nonisolated enum TendiesInstaller {
                 : partial + entry.uncompressedSize
         }
         guard expandedSize <= maximumExpandedSize else {
-            throw CommunityWallpaperError.packageTooLarge
+            throw EagleWallpaperError.packageTooLarge
         }
 
         let fm = FileManager.default
@@ -713,9 +725,9 @@ nonisolated enum TendiesInstaller {
         try extract(archive, to: root)
         let descriptors = try findDescriptors(in: root)
         log("(wallpaper) found \(descriptors.count) installable descriptor(s)")
-        guard !descriptors.isEmpty else { throw CommunityWallpaperError.noDescriptors }
+        guard !descriptors.isEmpty else { throw EagleWallpaperError.noDescriptors }
         guard descriptors.count <= maximumDescriptors else {
-            throw CommunityWallpaperError.tooManyDescriptors
+            throw EagleWallpaperError.tooManyDescriptors
         }
 
         var installed: [URL] = []
@@ -809,7 +821,7 @@ nonisolated enum TendiesInstaller {
             includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else {
-            throw CommunityWallpaperError.invalidPackage
+            throw EagleWallpaperError.invalidPackage
         }
 
         var descriptors: [TendiesDescriptor] = []
@@ -857,7 +869,7 @@ nonisolated enum TendiesInstaller {
                 PosterBoardWriter.mercuryExtension,
                 PosterBoardWriter.photosExtension
             ].contains(identifier) else {
-                throw CommunityWallpaperError.unsupportedExtension
+                throw EagleWallpaperError.unsupportedExtension
             }
             return identifier
         }
@@ -938,7 +950,7 @@ nonisolated enum TendiesInstaller {
             options: [],
             format: &format
         ) as? [String: Any] else {
-            throw CommunityWallpaperError.invalidPackage
+            throw EagleWallpaperError.invalidPackage
         }
         mutate(&plist)
         return try PropertyListSerialization.data(

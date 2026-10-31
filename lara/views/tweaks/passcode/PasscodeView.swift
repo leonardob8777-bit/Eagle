@@ -341,12 +341,12 @@ struct PasscodeView: View {
                             .background(Color.purple.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Explorar estilos")
+                            Text(LaraL10n.text(en: "Eagle passcode styles", es: "Estilos de código Eagle"))
                                 .font(.headline)
                                 .foregroundStyle(.primary)
                             Text(LaraL10n.text(
-                                en: "Designs created by the community",
-                                es: "Diseños creados por la comunidad"
+                                en: "Download and apply Eagle styles",
+                                es: "Descarga y aplica estilos Eagle"
                             ))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)

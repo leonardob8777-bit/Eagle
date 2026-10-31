@@ -8,51 +8,41 @@
 import Foundation
 import SwiftUI
 import Combine
+import CryptoKit
 
-let defaultPasscodeRepoURL = "https://raw.githubusercontent.com/SerStars/Nugget-Wallpapers/main/wallpapers-passthemes.json"
-private let passcodeRepoKey = "passcodeThemeRepos"
-private let retiredPasscodeRepoURL = "https://raw.githubusercontent.com/neonmodder123/theme-repo/refs/heads/main/passcode-themes.json"
+let defaultPasscodeRepoURL = "https://raw.githubusercontent.com/leonardob8777-bit/Eagle-Gallery/main/catalogs/passcode-v1.json"
 
 struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
+    let id: String
     let name: String
     let description: String
     let url: String
     let preview: String
+    let sha256: String
+    let byteCount: Int
     let authors: String?
-    let contact: PasscodeThemeContact?
     let version: String?
-    var id: String { url }
 
     var authorLine: String {
         if let authors, !authors.isEmpty { return authors }
-        if let contact { return contact.displayName }
-        return LaraL10n.text(en: "Cowabunga community", es: "Comunidad Cowabunga")
+        return "Eagle"
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, description, url, preview, authors, contact, version
+        case id, name, description, url, preview, sha256, byteCount, authors, version
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
         url = try container.decode(String.self, forKey: .url)
         preview = try container.decode(String.self, forKey: .preview)
+        sha256 = try container.decode(String.self, forKey: .sha256)
+        byteCount = try container.decode(Int.self, forKey: .byteCount)
         authors = try container.decodeIfPresent(String.self, forKey: .authors)
-        contact = try container.decodeIfPresent(PasscodeThemeContact.self, forKey: .contact)
         version = try container.decodeIfPresent(String.self, forKey: .version)
-    }
-}
-
-struct PasscodeThemeContact: Decodable, Equatable {
-    private let raw: [String: String]
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        raw = try container.decode([String: String].self)
-    }
-    var displayName: String {
-        raw.map { "\($0.key): \($0.value)" }.first ?? ""
     }
 }
 
@@ -80,7 +70,7 @@ final class PasscodeGalleryManager: ObservableObject {
     @Published var repos: [PasscodeRepoState] = []
     @Published var downloading: Set<String> = []
 
-    private var repoURLs: [String] = loadPasscodeRepoURLs()
+    private let repoURLs = [defaultPasscodeRepoURL]
 
     var allThemes: [PasscodeGalleryTheme] { repos.flatMap { $0.data?.themes ?? [] } }
     var themes: [PasscodeGalleryTheme] { allThemes }
@@ -106,7 +96,10 @@ final class PasscodeGalleryManager: ObservableObject {
     }
 
     func refreshRepos(forceRefresh: Bool = false) async {
-        repos = repoURLs.map { PasscodeRepoState(url: $0, isLoading: true, error: nil, data: nil) }
+        let previous = Dictionary(uniqueKeysWithValues: repos.map { ($0.url, $0.data) })
+        repos = repoURLs.map {
+            PasscodeRepoState(url: $0, isLoading: true, error: nil, data: previous[$0] ?? nil)
+        }
 
         await withTaskGroup(of: (String, Result<PasscodeRepoData, Error>).self) { group in
             for url in repoURLs {
@@ -129,22 +122,7 @@ final class PasscodeGalleryManager: ObservableObject {
         }
     }
 
-    func addRepo(_ urlString: String) async {
-        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, URL(string: trimmed) != nil, !repoURLs.contains(trimmed) else { return }
-        repoURLs.append(trimmed)
-        savePasscodeRepoURLs(repoURLs)
-        await refreshRepos()
-    }
-
-    func removeRepo(_ url: String) {
-        guard url != defaultPasscodeRepoURL else { return }
-        repoURLs.removeAll { $0 == url }
-        savePasscodeRepoURLs(repoURLs)
-        Task { await refreshRepos() }
-    }
-
-    func downloadAndImport(_ theme: PasscodeGalleryTheme) async throws {
+    func downloadAndImport(_ theme: PasscodeGalleryTheme) async throws -> URL {
         guard let fileURL = downloadURL(for: theme) else { throw URLError(.badURL) }
         downloading.insert(theme.id)
         defer { downloading.remove(theme.id) }
@@ -152,49 +130,44 @@ final class PasscodeGalleryManager: ObservableObject {
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
-        guard data.count <= 50 * 1024 * 1024 else {
-            throw CocoaError(.fileWriteOutOfSpace)
+        guard data.count == theme.byteCount,
+              data.count <= 50 * 1024 * 1024,
+              Data(SHA256.hash(data: data)).map({ String(format: "%02x", $0) }).joined() == theme.sha256.lowercased() else {
+            throw CocoaError(.fileReadCorruptFile)
         }
         let dest = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(theme.name + ".passthm")
+            .appendingPathComponent(theme.id + ".passthm")
         try data.write(to: dest, options: .atomic)
+        return dest
     }
 
     private func fetchRepo(_ urlString: String, forceRefresh: Bool = false) async throws -> PasscodeRepoData {
         guard let url = URL(string: urlString) else { throw URLError(.badURL) }
         var req = URLRequest(url: url)
         if forceRefresh { req.cachePolicy = .reloadIgnoringLocalCacheData }
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              data.count <= 1024 * 1024 else { throw URLError(.badServerResponse) }
         let baseURL = url.deletingLastPathComponent()
 
-        if let themes = try? JSONDecoder().decode([PasscodeGalleryTheme].self, from: data) {
-            let name = urlString == defaultPasscodeRepoURL ? "Nugget Wallpapers" : (url.deletingPathExtension().lastPathComponent)
-            return PasscodeRepoData(name: name, author: nil, icon: nil, themes: themes, baseURL: baseURL)
-        }
-
         struct RepoJSON: Decodable {
+            let schemaVersion: Int
             let repo_name: String
             let repo_author: String?
             let repo_icon: String?
             let themes: [PasscodeGalleryTheme]
         }
         let parsed = try JSONDecoder().decode(RepoJSON.self, from: data)
+        guard parsed.schemaVersion == 1, parsed.themes.count <= 1000,
+              Set(parsed.themes.map(\.id)).count == parsed.themes.count,
+              parsed.themes.allSatisfy({ theme in
+                  !theme.id.isEmpty &&
+                  theme.id.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0) }) &&
+                  theme.byteCount > 0 && theme.byteCount <= 50 * 1024 * 1024 &&
+                  theme.sha256.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil &&
+                  URL(string: theme.url, relativeTo: baseURL)?.absoluteURL.scheme == "https" &&
+                  URL(string: theme.preview, relativeTo: baseURL)?.absoluteURL.scheme == "https"
+              }) else { throw CocoaError(.fileReadCorruptFile) }
         return PasscodeRepoData(name: parsed.repo_name, author: parsed.repo_author, icon: parsed.repo_icon, themes: parsed.themes, baseURL: baseURL)
-    }
-}
-
-private func loadPasscodeRepoURLs() -> [String] {
-    if let data = UserDefaults.standard.data(forKey: passcodeRepoKey),
-       let urls = try? JSONDecoder().decode([String].self, from: data), !urls.isEmpty {
-        var result = urls.filter { $0 != retiredPasscodeRepoURL }
-        if !result.contains(defaultPasscodeRepoURL) { result.insert(defaultPasscodeRepoURL, at: 0) }
-        return result
-    }
-    return [defaultPasscodeRepoURL]
-}
-
-private func savePasscodeRepoURLs(_ urls: [String]) {
-    if let encoded = try? JSONEncoder().encode(urls) {
-        UserDefaults.standard.set(encoded, forKey: passcodeRepoKey)
     }
 }

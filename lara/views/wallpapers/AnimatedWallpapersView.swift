@@ -32,7 +32,7 @@ private enum WallpaperMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         self == .explore
-            ? LaraL10n.text(en: "Explore", es: "Explorar")
+            ? LaraL10n.text(en: "Eagle themes", es: "Temas Eagle")
             : LaraL10n.text(en: "Create", es: "Crear")
     }
 }
