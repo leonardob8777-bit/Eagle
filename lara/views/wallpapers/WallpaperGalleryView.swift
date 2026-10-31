@@ -15,6 +15,9 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
     let description: String?
     let url: String
     let preview: String
+    let foregroundPreview: String?
+    let foregroundSha256: String?
+    let foregroundByteCount: Int?
     let sha256: String
     let byteCount: Int
     let minimumIOSMajor: Int
@@ -22,7 +25,8 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
     let contest: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, description, url, preview, sha256, byteCount
+        case id, name, description, url, preview, foregroundPreview
+        case foregroundSha256, foregroundByteCount, sha256, byteCount
         case minimumIOSMajor, authors, contest
     }
 
@@ -33,6 +37,9 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
         description = try container.decodeIfPresent(String.self, forKey: .description)
         url = try container.decode(String.self, forKey: .url)
         preview = try container.decode(String.self, forKey: .preview)
+        foregroundPreview = try container.decodeIfPresent(String.self, forKey: .foregroundPreview)
+        foregroundSha256 = try container.decodeIfPresent(String.self, forKey: .foregroundSha256)
+        foregroundByteCount = try container.decodeIfPresent(Int.self, forKey: .foregroundByteCount)
         sha256 = try container.decode(String.self, forKey: .sha256)
         byteCount = try container.decode(Int.self, forKey: .byteCount)
         minimumIOSMajor = try container.decodeIfPresent(Int.self, forKey: .minimumIOSMajor) ?? 17
@@ -53,6 +60,10 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
 
     var previewURL: URL? {
         URL(string: preview, relativeTo: eagleGalleryBaseURL)?.absoluteURL
+    }
+
+    var foregroundPreviewURL: URL? {
+        foregroundPreview.flatMap { URL(string: $0, relativeTo: eagleGalleryBaseURL)?.absoluteURL }
     }
 
     var downloadURL: URL? {
@@ -163,7 +174,13 @@ private enum EagleWallpaperService {
                   item.byteCount > 0 && item.byteCount <= TendiesInstaller.maximumCompressedSize &&
                   (16...26).contains(item.minimumIOSMajor) &&
                   item.sha256.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil &&
-                  item.downloadURL?.scheme == "https" && item.previewURL?.scheme == "https"
+                  item.downloadURL?.scheme == "https" && item.previewURL?.scheme == "https" &&
+                  ((item.foregroundPreview == nil && item.foregroundSha256 == nil && item.foregroundByteCount == nil) ||
+                   (item.foregroundPreviewURL?.scheme == "https" &&
+                    item.foregroundPreviewURL?.host == "raw.githubusercontent.com" &&
+                    item.foregroundPreviewURL?.path.hasPrefix("/leonardob8777-bit/Eagle-Gallery/main/previews/wallpapers/foreground/") == true &&
+                    item.foregroundByteCount.map { $0 > 0 && $0 <= 20 * 1024 * 1024 } == true &&
+                    item.foregroundSha256?.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil))
               }) else { throw EagleWallpaperError.invalidResponse }
         return manifest.wallpapers
     }
@@ -512,17 +529,36 @@ struct WallpaperGalleryView: View {
     }
 }
 
+private struct EagleWallpaperArtwork: View {
+    let wallpaper: EagleWallpaper
+    let contentMode: ContentMode
+
+    var body: some View {
+        ZStack {
+            LaraRemoteMediaPreview(
+                url: wallpaper.previewURL,
+                animated: false,
+                contentMode: contentMode,
+                showsRetry: false
+            )
+            if let foregroundURL = wallpaper.foregroundPreviewURL {
+                AsyncImage(url: foregroundURL) { phase in
+                    if let image = phase.image {
+                        image.resizable().aspectRatio(contentMode: contentMode)
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+        }
+    }
+}
+
 private struct EagleWallpaperCard: View {
     let wallpaper: EagleWallpaper
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            LaraRemoteMediaPreview(
-                url: wallpaper.previewURL,
-                animated: false,
-                contentMode: .fill,
-                showsRetry: false
-            )
+            EagleWallpaperArtwork(wallpaper: wallpaper, contentMode: .fill)
             .frame(maxWidth: .infinity)
             .frame(height: 205)
             .clipped()
@@ -581,14 +617,8 @@ private struct EagleWallpaperDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if let previewURL = wallpaper.previewURL {
-                    LaraRemoteMediaPreview(
-                        url: previewURL,
-                        animated: true,
-                        contentMode: .fit,
-                        showsRetry: true,
-                        background: .black
-                    )
+                if wallpaper.previewURL != nil {
+                    EagleWallpaperArtwork(wallpaper: wallpaper, contentMode: .fit)
                         .aspectRatio(9.0 / 16.0, contentMode: .fit)
                         .frame(maxWidth: 340)
                         .frame(maxWidth: .infinity)
@@ -723,21 +753,40 @@ private struct EagleWallpaperDetail: View {
                   url.path.hasPrefix("/leonardob8777-bit/Eagle-Gallery/main/previews/wallpapers/") else {
                 throw URLError(.badURL)
             }
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 30
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse,
-                  http.statusCode == 200,
-                  data.count <= 20 * 1024 * 1024,
-                  data.starts(with: [0x89, 0x50, 0x4E, 0x47]),
-                  UIImage(data: data) != nil else {
+            let backgroundData = try await downloadPNG(from: url)
+            guard let background = UIImage(data: backgroundData) else {
                 throw EagleWallpaperError.invalidResponse
+            }
+            var imageData = backgroundData
+            if let foregroundURL = wallpaper.foregroundPreviewURL {
+                guard let expectedSize = wallpaper.foregroundByteCount,
+                      let expectedSHA = wallpaper.foregroundSha256 else {
+                    throw EagleWallpaperError.invalidResponse
+                }
+                let foregroundData = try await downloadPNG(from: foregroundURL)
+                guard foregroundData.count == expectedSize,
+                      Data(SHA256.hash(data: foregroundData)).map({ String(format: "%02x", $0) }).joined() == expectedSHA.lowercased(),
+                      let foreground = UIImage(data: foregroundData),
+                      foreground.size == background.size else {
+                    throw EagleWallpaperError.invalidResponse
+                }
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1
+                format.opaque = true
+                let combined = UIGraphicsImageRenderer(size: background.size, format: format).image { _ in
+                    background.draw(in: CGRect(origin: .zero, size: background.size))
+                    foreground.draw(in: CGRect(origin: .zero, size: background.size))
+                }
+                guard let combinedPNG = combined.pngData() else {
+                    throw EagleWallpaperError.invalidResponse
+                }
+                imageData = combinedPNG
             }
             let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("Eagle Wallpapers", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let destination = directory.appendingPathComponent(wallpaper.id + ".png")
-            try data.write(to: destination, options: .atomic)
+            try imageData.write(to: destination, options: .atomic)
             shareImage = EagleWallpaperShareImage(url: destination)
         } catch {
             EagleNotifications.shared.show(
@@ -746,6 +795,20 @@ private struct EagleWallpaperDetail: View {
                 kind: .error
             )
         }
+    }
+
+    private func downloadPNG(from url: URL) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 30
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse,
+              http.statusCode == 200,
+              data.count <= 20 * 1024 * 1024,
+              data.starts(with: [0x89, 0x50, 0x4E, 0x47]),
+              UIImage(data: data) != nil else {
+            throw EagleWallpaperError.invalidResponse
+        }
+        return data
     }
 }
 
