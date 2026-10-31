@@ -228,11 +228,7 @@ struct HomeIconNeonView: View {
     }
 
     private var supportedDevice: Bool {
-        let version = ProcessInfo.processInfo.operatingSystemVersion
-        return devicemachine() == "iPhone17,1" &&
-            version.majorVersion == 18 &&
-            version.minorVersion == 6 &&
-            version.patchVersion == 2
+        eagleSupportAssessment().allowsPrepare
     }
 
     private var recordedPageCount: Int {
@@ -745,12 +741,12 @@ struct HomeIconNeonView: View {
             Text(
                 supportedDevice
                     ? LaraL10n.text(
-                        en: "Verified allowlist: iPhone 16 Pro · iOS 18.6.2.",
-                        es: "Lista permitida: iPhone 16 Pro · iOS 18.6.2."
+                        en: "The access engine supports this device. This effect still needs testing on each device and iOS version.",
+                        es: "El motor de acceso admite este dispositivo. Este efecto aún necesita pruebas en cada dispositivo y versión de iOS."
                     )
                     : LaraL10n.text(
-                        en: "This first test build is locked to iPhone 16 Pro on iOS 18.6.2.",
-                        es: "Esta primera build de prueba está limitada al iPhone 16 Pro con iOS 18.6.2."
+                        en: "The access engine does not support this device and iOS version.",
+                        es: "El motor de acceso no admite este dispositivo y esta versión de iOS."
                     )
             )
             .font(.footnote)
@@ -846,8 +842,8 @@ struct HomeIconNeonView: View {
         }
         guard supportedDevice else {
             finishBeforeCall(LaraL10n.text(
-                en: "No system call was sent. This build accepts only iPhone 16 Pro on iOS 18.6.2.",
-                es: "No se envió ninguna llamada. Esta build acepta solo iPhone 16 Pro con iOS 18.6.2."
+                en: "No system call was sent. The access engine does not support this device and iOS version.",
+                es: "No se envió ninguna llamada. El motor de acceso no admite este dispositivo y esta versión de iOS."
             ))
             return
         }
