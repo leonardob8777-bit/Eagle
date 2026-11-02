@@ -215,3 +215,7 @@ Dynamic Island requires supported iPhone hardware. iPad admission is verified in
 the compatibility tests; applying individual effects on physical iPads remains unverified.
 
 See [1.0.7 release notes](docs/releases/v1.0.7.md) for validation and the IPA.
+
+Likes use a random identifier stored on the device, sent with the selected item and like state.
+While Eagle is in the foreground, the online counter sends a presence heartbeat once per minute.
+The service endpoint is configured in `lara/EagleCore/Likes/EagleLikes.swift`.
