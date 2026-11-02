@@ -71,16 +71,17 @@
 | 🔤 **App Name Color · Advanced** | Applies a page-owned solid color to app names on the current Home Screen page. |
 | 🛡️ **Eagle System** | Adds Guardian checks, Scenes and shareable personalization recipes. |
 
-### New in Eagle 1.0.6
+### New in Eagle 1.0.7
 
-- **简体中文:** Simplified Chinese joins English and Spanish, with language changes applied immediately.
-- **A new opening:** monochrome Eagle icon, animated logo launch and a circular transition from the welcome screen.
-- **Actions within reach:** fixed bottom Prepare/Apply bars across customization screens; previews and saving stay in the page.
-- **31 new Dock backgrounds:** 18 Static and 13 Live additions to the online gallery.
-- **Clearer controls:** readable text over gradients, solid secondary buttons, legible disabled labels and switches that remain visible and unclipped in light and dark mode.
-- **Smoother feedback:** refined tab transitions, touch feedback and Prepare progress, with hidden background animations paused.
+- **Русский · Tiếng Việt:** Russian and Vietnamese join English, Spanish and Simplified Chinese, including system prompts, the update window and gallery names.
+- **25 passcode styles:** 15 symbol sets and 10 number styles in the online gallery. Prepare now sits inside each style and turns into **Use style** once the device is ready.
+- **Wallpapers without updating:** 15 online wallpapers; new ones arrive through the gallery instead of a new IPA.
+- **Likes and HOT:** like wallpapers, passcode styles, Dock and Island artwork. The most liked come first and the top item wears **HOT**.
+- **People online:** a live count in Customize of who has Eagle open right now.
+- **NEW labels:** each new Customize section is marked until you open it.
+- **Better notifications and faster previews:** clearer results that close with a tap or swipe, and quicker passcode and wallpaper previews.
 
-Read the [complete release notes](docs/releases/v1.0.6.md), including verification and known visual limitations. This update does not expand iOS compatibility.
+Read the [complete release notes](docs/releases/v1.0.7.md), including verification and the IPA checksum. Earlier changes: [1.0.6](docs/releases/v1.0.6.md).
 
 ### Aura Studio safety model
 
@@ -109,6 +110,8 @@ Looking for an older build? Browse [all Eagle releases](https://github.com/leona
 
 - **Prepare support:** iOS 16.x has limited testing (16.7.2 is the verified limited route);
   iOS 17.0–18.7.1 and 26.0–26.0.1 are accepted.
+- **iPad:** Prepare admits iPads on iPadOS 17.0–18.7.1 and 26.0–26.0.1, excluding M5.
+  iPadOS 16 remains blocked. Individual effects on physical iPads remain unverified.
 - Unverified iOS 16 builds, releases outside the supported ranges above and
   current MIE devices are blocked.
 - iPhone 16 (`iPhone17,3`) running iOS 18.5 follows the supported Prepare route.
@@ -127,6 +130,10 @@ Looking for an older build? Browse [all Eagle releases](https://github.com/leona
 
 Device strings such as `iPhone15,2` are Apple's technical model identifiers
 (`iPhone15,2` is an iPhone 14 Pro), not the marketing generation number.
+
+**Likes and online count:** likes use a random identifier stored on the device, sent with
+the selected item and like state. While Eagle is open, the online counter sends a presence
+heartbeat once per minute. The service endpoint is in `lara/EagleCore/Likes/EagleLikes.swift`.
 
 ## Build from source
 
@@ -201,21 +208,3 @@ for the complete upstream record.
   <br>
   <sub>Built with Swift, SwiftUI and DarkSword.</sub>
 </div>
-
-## Eagle 1.0.7
-
-Russian and Vietnamese are available in Settings → Language and in the welcome screen.
-The update window, localized system prompts, online wallpaper and passcode names,
-likes/HOT ordering, online presence, refreshed galleries, and saved PosterBoard UUID
-workflow are included in this release. Catalog names fall back to English when a translation is missing.
-
-Prepare admits iPads on iPadOS 17.0–18.7.1 and 26.0–26.0.1, excluding M5.
-iPadOS 16 remains blocked; the 16.7.2 exception was tested only on iPhone.
-Dynamic Island requires supported iPhone hardware. iPad admission is verified in
-the compatibility tests; applying individual effects on physical iPads remains unverified.
-
-See [1.0.7 release notes](docs/releases/v1.0.7.md) for validation and the IPA.
-
-Likes use a random identifier stored on the device, sent with the selected item and like state.
-While Eagle is in the foreground, the online counter sends a presence heartbeat once per minute.
-The service endpoint is configured in `lara/EagleCore/Likes/EagleLikes.swift`.
