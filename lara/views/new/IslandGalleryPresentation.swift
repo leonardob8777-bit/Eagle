@@ -43,6 +43,7 @@ struct IslandGalleryView: View {
     @AppStorage("eagle.islandGallery.selectedStyle") private var selectedRaw = IslandGalleryStyle.starlight.rawValue
     @AppStorage("eagle.islandGallery.selectedArtworkID") private var selectedID = ""
     @AppStorage("eagle.islandGallery.favoriteIDs") private var favoritesJSON = "[]"
+    @ObservedObject private var likes = EagleLikes.shared
     @AppStorage("eagle.islandGallery.shadowIntensity") private var shadowIntensity = 0.72
     @AppStorage("eagle.islandGallery.positionX") private var positionX = 0.0
     @AppStorage("eagle.islandGallery.positionY") private var positionY = 0.0
@@ -74,7 +75,8 @@ struct IslandGalleryView: View {
         EagleIslandGalleryFavorites.decode(favoritesJSON)
     }
     private var visibleArtworks: [IslandGalleryArtwork] {
-        EagleIslandGalleryCollection.visible(
+        // Most liked first.
+        likes.sortedByLikes(EagleIslandGalleryCollection.visible(
             search: { search },
             artworks: { artworks },
             filter: { filter },
@@ -82,7 +84,11 @@ struct IslandGalleryView: View {
             isLive: { $0.isLive },
             title: { $0.title },
             subtitle: { $0.subtitle }
-        )
+        ), .island, id: \.id)
+    }
+
+    private var hotArtworkID: String? {
+        likes.hottest(.island, among: visibleArtworks.map(\.id))
     }
     private var selected: IslandGalleryArtwork? {
         selectionController.selected
@@ -166,6 +172,7 @@ struct IslandGalleryView: View {
             }
             .sheet(isPresented: $showAccess) { accessSheet }
             .task { await loadCatalog() }
+            .task { await EagleLikes.shared.refresh(.island, favorites: favorites) }
             .onAppear { restoreSelection() }
             .onChange(of: search) { _ in synchronizeSelection() }
             .onChange(of: favoritesJSON) { _ in synchronizeSelection() }
@@ -204,6 +211,9 @@ struct IslandGalleryView: View {
                 Text(item.title)
                     .font(.title3.bold())
                     .lineLimit(2)
+                if item.id == hotArtworkID {
+                    EagleHotBadge()
+                }
                 Spacer(minLength: 6)
                 if item.isLive {
                     Button { motionPaused.toggle() } label: {
@@ -358,6 +368,20 @@ struct IslandGalleryView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(EaglePressableStyle())
+            .overlay(alignment: .bottomLeading) {
+                if item.id == hotArtworkID {
+                    EagleHotBadge()
+                        .padding(.leading, 10)
+                        .padding(.bottom, 10)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                EagleLikeButton(kind: .island, id: item.id, isLiked: favorites.contains(item.id)) {
+                    toggleFavorite(item)
+                }
+                .disabled(applying)
+                .padding(2)
+            }
             .accessibilityLabel(LaraL10n.text(en: "Preview \(item.title)", es: "Ver \(item.title)"))
             .disabled(applying)
             HStack(spacing: 2) {
@@ -371,16 +395,6 @@ struct IslandGalleryView: View {
                 }
                 .buttonStyle(EaglePressableStyle(kind: .card))
                 .disabled(applying)
-                Button { toggleFavorite(item) } label: {
-                    Image(systemName: favorites.contains(item.id) ? "heart.fill" : "heart")
-                        .font(.system(size: 12))
-                        .foregroundStyle(favorites.contains(item.id) ? .pink : .secondary)
-                        .eagleSymbolPop(favorites.contains(item.id))
-                        .frame(width: 34, height: 44)
-                }
-                .buttonStyle(EaglePressableStyle(kind: .swatch))
-                .disabled(applying)
-                .accessibilityLabel(favoriteLabel(item))
             }
             .padding(.leading, 12)
             .padding(.trailing, 4)
@@ -540,27 +554,19 @@ struct IslandGalleryView: View {
     }
 
     private func favoriteButton(_ item: IslandGalleryArtwork) -> some View {
-        Button { toggleFavorite(item) } label: {
-            Image(systemName: favorites.contains(item.id) ? "heart.fill" : "heart")
-                .font(.system(size: 16))
-                .foregroundStyle(favorites.contains(item.id) ? Color.pink : .primary)
-                .eagleSymbolPop(favorites.contains(item.id))
-                .frame(width: 44, height: 44)
-                .background(Color.primary.opacity(0.05), in: Circle())
+        EagleLikeButton(kind: .island, id: item.id, isLiked: favorites.contains(item.id), onArtwork: false) {
+            toggleFavorite(item)
         }
-        .buttonStyle(EaglePressableStyle(kind: .swatch))
         .disabled(applying)
-        .accessibilityLabel(favoriteLabel(item))
         .accessibilityIdentifier("island-favorite")
     }
 
-    private func favoriteLabel(_ item: IslandGalleryArtwork) -> String {
-        favorites.contains(item.id)
-            ? LaraL10n.text(en: "Remove \(item.title) from favorites", es: "Quitar \(item.title) de favoritos")
-            : LaraL10n.text(en: "Save \(item.title) to favorites", es: "Guardar \(item.title) en favoritos")
-    }
-
     private func toggleFavorite(_ item: IslandGalleryArtwork) {
+        let wasLiked = favorites.contains(item.id)
+        defer {
+            let liked = favorites.contains(item.id)
+            if liked != wasLiked { EagleLikes.shared.setLiked(.island, item.id, liked: liked) }
+        }
         EagleIslandGalleryFavorites.toggle(
             applying: { applying },
             favorites: { favorites },
@@ -635,7 +641,7 @@ struct IslandGalleryView: View {
             applyLive: { await IslandGalleryExecutor.shared.applyLive($0, shadowIntensity: shadowIntensity) },
             applyStyle: { await IslandGalleryExecutor.shared.apply($0.style, shadowIntensity: shadowIntensity) },
             feedback: { UINotificationFeedbackGenerator().notificationOccurred($0.succeeded ? .success : .error) },
-            notify: { EagleNotifications.shared.result($0.succeeded, title: "Island Gallery", message: $0.message) }
+            notify: { EagleNotifications.shared.result($0.succeeded, title: LaraL10n.text(en: "Island Gallery", es: "Galería Island"), message: $0.message) }
         )
     }
 
@@ -645,7 +651,7 @@ struct IslandGalleryView: View {
             setApplying: { applying = $0 },
             execute: { await IslandGalleryExecutor.shared.restore() },
             feedback: { UINotificationFeedbackGenerator().notificationOccurred($0.succeeded ? .success : .error) },
-            notify: { EagleNotifications.shared.result($0.succeeded, title: "Island Gallery", message: $0.message) }
+            notify: { EagleNotifications.shared.result($0.succeeded, title: LaraL10n.text(en: "Island Gallery", es: "Galería Island"), message: $0.message) }
         )
     }
 }

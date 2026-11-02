@@ -90,6 +90,7 @@ struct HomeLabelColorView: View {
     @State private var operationStage = ""
     @State private var notice: HomeLabelColorNotice?
     @State private var lastResult: Int32?
+    @State private var showsDetails = false
 
     private var selectedColor: Color {
         Color(red: red, green: green, blue: blue)
@@ -149,19 +150,22 @@ struct HomeLabelColorView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 20) {
                 previewCard
                 colorCard
-                scopeCard
-                diagnosticsCard
+                detailsCard
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
         // Apply stays fixed at the bottom, in reach of the thumb; Prepare takes its place until ready.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             EagleApplyBar(ready: mgr.dsready) {
                 applyButton
-                restoreButton
+                if hasRecordedEffect {
+                    restoreButton
+                }
             }
         }
         .eagleScreenBackdrop()
@@ -193,27 +197,14 @@ struct HomeLabelColorView: View {
         }
     }
 
+    /// A Home Screen page: eight apps with their names in the chosen colour, and the recorded state
+    /// only when there is one.
     private var previewCard: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 4) {
-                Text(LaraL10n.text(
-                    en: "Give app names your color",
-                    es: "Dale tu color a los nombres"
-                ))
-                .font(.headline)
-                Text(LaraL10n.text(
-                    en: "Solid color only — no glow, outline, or animation.",
-                    es: "Solo color sólido: sin brillo, borde ni animación."
-                ))
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.75))
-                .multilineTextAlignment(.center)
-            }
-
-            HStack(spacing: 24) {
-                previewApp(icon: "message.fill", name: "Messages", tint: .green)
-                previewApp(icon: "safari.fill", name: "Safari", tint: .blue)
-                previewApp(icon: "music.note", name: "Music", tint: .pink)
+        VStack(spacing: 18) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 18) {
+                ForEach(Array(previewApps.enumerated()), id: \.offset) { _, app in
+                    previewApp(icon: app.icon, name: app.name, tint: app.tint)
+                }
             }
             .accessibilityHidden(true)
             .animation(
@@ -221,147 +212,183 @@ struct HomeLabelColorView: View {
                 value: selectedColor
             )
 
-            Label(
-                cleanupRequired
-                    ? LaraL10n.text(en: "Restore required", es: "Se requiere restaurar")
-                    : (activePageCount > 0
-                        ? LaraL10n.text(
+            if hasRecordedEffect {
+                Label(
+                    cleanupRequired
+                        ? LaraL10n.text(en: "Restore required", es: "Se requiere restaurar")
+                        : LaraL10n.text(
                             en: "\(activePageCount) Home page\(activePageCount == 1 ? "" : "s") recorded",
                             es: "\(activePageCount) página\(activePageCount == 1 ? "" : "s") registrada\(activePageCount == 1 ? "" : "s")"
-                        )
-                        : LaraL10n.text(en: "System colors unchanged", es: "Colores del sistema sin cambios")),
-                systemImage: cleanupRequired
-                    ? "exclamationmark.triangle.fill"
-                    : (activePageCount > 0 ? "checkmark.circle.fill" : "circle")
-            )
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(cleanupRequired ? Color.orange : (activePageCount > 0 ? Color.green : Color.white.opacity(0.7)))
+                        ),
+                    systemImage: cleanupRequired ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(cleanupRequired ? Color.orange : Color.green)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(18)
-        // A solid black base under the gradient: it looks exactly as before on black, and the backdrop
-        // no longer shows through the card's lighter corner.
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.black)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(LinearGradient(
-                            colors: [Color.black.opacity(0.94), Color.gray.opacity(0.26)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                }
-        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 22)
+        .background(Color(red: 0.07, green: 0.07, blue: 0.09), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1)
         }
-        .foregroundStyle(.white)
+        .environment(\.colorScheme, .dark)
+    }
+
+    private var previewApps: [(icon: String, name: String, tint: Color)] {
+        [
+            ("message.fill", LaraL10n.text(en: "Messages", es: "Mensajes"), .green),
+            ("safari.fill", "Safari", .blue),
+            ("music.note", LaraL10n.text(en: "Music", es: "Música"), .pink),
+            ("camera.fill", LaraL10n.text(en: "Camera", es: "Cámara"), .gray),
+            ("photo.fill", LaraL10n.text(en: "Photos", es: "Fotos"), .orange),
+            ("map.fill", LaraL10n.text(en: "Maps", es: "Mapas"), .teal),
+            ("cloud.sun.fill", LaraL10n.text(en: "Weather", es: "Tiempo"), .cyan),
+            ("gearshape.fill", LaraL10n.text(en: "Settings", es: "Ajustes"), .gray),
+        ]
     }
 
     private func previewApp(icon: String, name: String, tint: Color) -> some View {
         VStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .fill(tint.gradient)
-                .frame(width: 52, height: 52)
+                .frame(width: 54, height: 54)
                 .overlay {
                     Image(systemName: icon)
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
                 }
             Text(name)
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(selectedColor)
                 .lineLimit(1)
         }
-        .frame(width: 72)
+        .frame(maxWidth: .infinity)
     }
 
+    /// The eight colours and, as the ninth swatch, any colour at all.
     private var colorCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(LaraL10n.text(en: "Text color", es: "Color del texto"))
                 .font(.headline)
 
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 52, maximum: 62), spacing: 10)],
-                spacing: 10
-            ) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 12) {
                 ForEach(HomeLabelColorPreset.all) { preset in
                     Button {
                         store(preset.color)
                     } label: {
-                        Circle()
-                            .fill(preset.color)
-                            .frame(width: 36, height: 36)
-                            .overlay {
-                                Circle()
-                                    .strokeBorder(.primary.opacity(0.22), lineWidth: 1)
-                            }
-                            .frame(width: 52, height: 52)
-                            .overlay {
-                                Circle()
-                                    .strokeBorder(Color.accentColor, lineWidth: 2.5)
-                                    .opacity(matchesSelection(preset) ? 1 : 0)
-                            }
+                        swatch(preset.color, selected: matchesSelection(preset))
                     }
                     .buttonStyle(HomeLabelColorPressStyle())
                     .disabled(isApplying)
                     .accessibilityLabel(preset.title)
                     .accessibilityAddTraits(matchesSelection(preset) ? .isSelected : [])
-                    .animation(
-                        reduceMotion ? nil : .easeInOut(duration: 0.18),
-                        value: matchesSelection(preset)
-                    )
                 }
+
+                ColorPicker(
+                    LaraL10n.text(en: "Choose any color", es: "Elegir cualquier color"),
+                    selection: selectedColorBinding,
+                    supportsOpacity: false
+                )
+                .labelsHidden()
+                .scaleEffect(1.25)
+                .frame(width: 48, height: 48)
+                .disabled(isApplying)
             }
 
-            Divider()
-
-            ColorPicker(
-                LaraL10n.text(en: "Choose any color", es: "Elegir cualquier color"),
-                selection: selectedColorBinding,
-                supportsOpacity: false
-            )
-            .font(.subheadline.weight(.medium))
-            .frame(minHeight: 44)
-            .disabled(isApplying)
+            if !policyAllowsApply {
+                Label(
+                    LaraL10n.text(
+                        en: "Switch the feature channel to Advanced to apply. Restore remains available.",
+                        es: "Cambia el canal de funciones a Avanzado para aplicar. Restaurar sigue disponible."
+                    ),
+                    systemImage: "bolt.fill"
+                )
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.orange)
+            }
         }
         .padding(18)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
         }
     }
 
-    private var scopeCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(
-                LaraL10n.text(en: "Current Home page", es: "Página de inicio actual"),
-                systemImage: "textformat"
-            )
-            // Keeps the "Aa" symbol in every language (it is redrawn as 格式 in Chinese).
-            .environment(\.locale, Locale(identifier: "en"))
-            .font(.headline)
-            .foregroundStyle(.indigo)
+    private func swatch(_ color: Color, selected: Bool) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: 34, height: 34)
+            .overlay { Circle().strokeBorder(.primary.opacity(0.22), lineWidth: 1) }
+            .padding(4)
+            .overlay {
+                Circle()
+                    .strokeBorder(Color.primary, lineWidth: 2)
+                    .opacity(selected ? 1 : 0)
+            }
+            .frame(width: 48, height: 48)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: selected)
+    }
 
-            Text(LaraL10n.text(
-                en: "Visit the Home page you want, reopen Eagle, then apply. Only the names beneath app icons on that root page are recolored. Dock, folders, App Library, Dynamic Island, and Prepare are excluded.",
-                es: "Visita la página de inicio deseada, vuelve a abrir Eagle y aplica. Solo cambian los nombres bajo los iconos de apps de esa página raíz. Dock, carpetas, Biblioteca, Dynamic Island y Preparar quedan excluidos."
-            ))
+    /// What it changes in one line; the rest (limits, compatibility, logs) folded away.
+    private var detailsCard: some View {
+        DisclosureGroup(isExpanded: $showsDetails) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(LaraL10n.text(
+                    en: "Visit the Home page you want, reopen Eagle, then apply. Dock, folders, App Library, Dynamic Island, and Prepare are excluded.",
+                    es: "Visita la página de inicio deseada, vuelve a abrir Eagle y aplica. Dock, carpetas, Biblioteca, Dynamic Island y Preparar quedan excluidos."
+                ))
+                Text(LaraL10n.text(
+                    en: "SpringBoard may rebuild labels after changing pages, rotating, or respringing. Restore removes only Eagle's colored copy; the original system label is not modified.",
+                    es: "SpringBoard puede reconstruir los nombres al cambiar de página, rotar o hacer respring. Restaurar elimina solo la copia coloreada de Eagle; el nombre original del sistema no se modifica."
+                ))
+                Text(supportedDevice
+                    ? LaraL10n.text(
+                        en: "The access engine supports this device. This effect still needs testing on each device and iOS version.",
+                        es: "El motor de acceso admite este dispositivo. Este efecto aún necesita pruebas en cada dispositivo y versión de iOS."
+                    )
+                    : LaraL10n.text(
+                        en: "The access engine does not support this device and iOS version.",
+                        es: "El motor de acceso no admite este dispositivo y esta versión de iOS."
+                    ))
+                if let lastResult {
+                    Text(LaraL10n.text(en: "Native result: \(lastResult)", es: "Resultado nativo: \(lastResult)"))
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                }
+                NavigationLink {
+                    LogsView(logger: globallogger)
+                } label: {
+                    Label(
+                        LaraL10n.text(en: "Open Eagle Logs", es: "Abrir registros de Eagle"),
+                        systemImage: "doc.text.magnifyingglass"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                }
+            }
             .font(.footnote)
             .foregroundStyle(.secondary)
-
-            Text(LaraL10n.text(
-                en: "SpringBoard may rebuild labels after changing pages, rotating, or respringing. Restore removes only Eagle's colored copy; the original system label is not modified.",
-                es: "SpringBoard puede reconstruir los nombres al cambiar de página, rotar o hacer respring. Restaurar elimina solo la copia coloreada de Eagle; el nombre original del sistema no se modifica."
-            ))
-            .font(.caption)
-            .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 10)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(LaraL10n.text(en: "How it works", es: "Cómo funciona"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(LaraL10n.text(
+                    en: "Only the names on the current Home page change.",
+                    es: "Solo cambian los nombres de la página de inicio actual."
+                ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding(18)
+        .tint(.secondary)
+        .padding(16)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
@@ -374,12 +401,8 @@ struct HomeLabelColorView: View {
         Button {
             run(enabled: true)
         } label: {
-            Label(
-                LaraL10n.text(en: "Apply to Current Page", es: "Aplicar a la página actual"),
-                systemImage: "paintpalette.fill"
-            )
-            .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 52)
+            Text(LaraL10n.text(en: "Apply to Current Page", es: "Aplicar a la página actual"))
+                .frame(maxWidth: .infinity)
         }
         .buttonStyle(EagleApplyButtonStyle(busy: isApplying))
         .disabled(
@@ -389,75 +412,14 @@ struct HomeLabelColorView: View {
     }
 
     private var restoreButton: some View {
-        Button(role: .destructive) {
+        Button {
             run(enabled: false)
         } label: {
-            Label(
-                LaraL10n.text(en: "Restore System Color", es: "Restaurar color del sistema"),
-                systemImage: "arrow.uturn.backward.circle.fill"
-            )
-            .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 52)
+            Text(LaraL10n.text(en: "Restore System Color", es: "Restaurar color del sistema"))
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
-        .disabled(isApplying || !hasRecordedEffect || !mgr.dsready || mgr.rcSafetyLocked)
-    }
-
-    private var diagnosticsCard: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Label(
-                LaraL10n.text(en: "Compatibility", es: "Compatibilidad"),
-                systemImage: "checkmark.shield"
-            )
-            .font(.headline)
-
-            Text(
-                supportedDevice
-                    ? LaraL10n.text(
-                        en: "The access engine supports this device. This effect still needs testing on each device and iOS version.",
-                        es: "El motor de acceso admite este dispositivo. Este efecto aún necesita pruebas en cada dispositivo y versión de iOS."
-                    )
-                    : LaraL10n.text(
-                        en: "The access engine does not support this device and iOS version.",
-                        es: "El motor de acceso no admite este dispositivo y esta versión de iOS."
-                    )
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-            if !policyAllowsApply {
-                Text(LaraL10n.text(
-                    en: "Switch the feature channel to Advanced to apply. Restore remains available.",
-                    es: "Cambia el canal de funciones a Avanzado para aplicar. Restaurar sigue disponible."
-                ))
-                .font(.caption)
-                .foregroundStyle(.orange)
-            }
-
-            if let lastResult {
-                Text("Native result: \(lastResult)")
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.tertiary)
-            }
-
-            NavigationLink {
-                LogsView(logger: globallogger)
-            } label: {
-                Label(
-                    LaraL10n.text(en: "Open Eagle Logs", es: "Abrir registros de Eagle"),
-                    systemImage: "doc.text.magnifyingglass"
-                )
-                .font(.subheadline.weight(.semibold))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
-        }
+        .buttonStyle(EagleSecondaryButtonStyle())
+        .disabled(isApplying || !mgr.dsready || mgr.rcSafetyLocked)
     }
 
     private func store(_ color: Color) {

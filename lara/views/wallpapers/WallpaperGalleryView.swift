@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import CryptoKit
+import AVKit
 
 private let eagleGalleryBaseURL = URL(
     string: "https://raw.githubusercontent.com/leonardob8777-bit/Eagle-Gallery/main/"
@@ -13,8 +14,13 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
     let id: String
     let name: String
     let description: String?
+    /// The name in each interface language ("en", "es", "zh-Hans", "ru", "vi"); English, then `name`, when one is missing.
+    let names: [String: String]?
     let url: String
     let preview: String
+    let stillPreview: String?
+    let motionPreview: String?
+    let isBundled: Bool
     let foregroundPreview: String?
     let foregroundSha256: String?
     let foregroundByteCount: Int?
@@ -23,11 +29,16 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
     let minimumIOSMajor: Int
     let authors: String?
     let contest: String?
+    /// "personal" for Leonardo's own collection, shown in its own section.
+    let collection: String?
+    /// False for the passcode styles' companion wallpapers: kept for "Matching wallpaper", left out of
+    /// the gallery itself.
+    let listed: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, description, url, preview, foregroundPreview
+        case id, name, names, description, url, preview, stillPreview, motionPreview, isBundled, foregroundPreview
         case foregroundSha256, foregroundByteCount, sha256, byteCount
-        case minimumIOSMajor, authors, contest
+        case minimumIOSMajor, authors, contest, collection, listed
     }
 
     init(from decoder: Decoder) throws {
@@ -35,8 +46,12 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         description = try container.decodeIfPresent(String.self, forKey: .description)
+        names = try container.decodeIfPresent([String: String].self, forKey: .names)
         url = try container.decode(String.self, forKey: .url)
         preview = try container.decode(String.self, forKey: .preview)
+        stillPreview = try container.decodeIfPresent(String.self, forKey: .stillPreview)
+        motionPreview = try container.decodeIfPresent(String.self, forKey: .motionPreview)
+        isBundled = try container.decodeIfPresent(Bool.self, forKey: .isBundled) ?? false
         foregroundPreview = try container.decodeIfPresent(String.self, forKey: .foregroundPreview)
         foregroundSha256 = try container.decodeIfPresent(String.self, forKey: .foregroundSha256)
         foregroundByteCount = try container.decodeIfPresent(Int.self, forKey: .foregroundByteCount)
@@ -45,9 +60,26 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
         minimumIOSMajor = try container.decodeIfPresent(Int.self, forKey: .minimumIOSMajor) ?? 17
         authors = try container.decodeIfPresent(String.self, forKey: .authors)
         contest = try container.decodeIfPresent(String.self, forKey: .contest)
+        collection = try container.decodeIfPresent(String.self, forKey: .collection)
+        listed = try container.decodeIfPresent(Bool.self, forKey: .listed) ?? true
+    }
+
+    var isPersonal: Bool {
+        isBundled || collection == "personal"
+    }
+
+    var displayName: String {
+        if let localized = names?[LaraL10n.language.rawValue], !localized.isEmpty { return localized }
+        // A language the catalog does not cover yet reads the English name, not the Spanish `name`.
+        if LaraL10n.language != .spanish, let english = names?["en"], !english.isEmpty { return english }
+        return name
     }
 
     var authorLine: String {
+        // The personal collection is named in the interface language.
+        if isPersonal {
+            return LaraL10n.text(en: "Personal collection", es: "Colección personal")
+        }
         guard let authors, !authors.isEmpty else {
             return "Eagle"
         }
@@ -59,7 +91,16 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
     }
 
     var previewURL: URL? {
-        URL(string: preview, relativeTo: eagleGalleryBaseURL)?.absoluteURL
+        if isBundled { return bundledURL(preview) }
+        return URL(string: preview, relativeTo: eagleGalleryBaseURL)?.absoluteURL
+    }
+
+    var stillPreviewURL: URL? {
+        stillPreview.flatMap { isBundled ? bundledURL($0) : URL(string: $0, relativeTo: eagleGalleryBaseURL)?.absoluteURL }
+    }
+
+    var motionPreviewURL: URL? {
+        motionPreview.flatMap { isBundled ? bundledURL($0) : URL(string: $0, relativeTo: eagleGalleryBaseURL)?.absoluteURL }
     }
 
     var foregroundPreviewURL: URL? {
@@ -67,7 +108,18 @@ struct EagleWallpaper: Decodable, Identifiable, Hashable {
     }
 
     var downloadURL: URL? {
-        URL(string: url, relativeTo: eagleGalleryBaseURL)?.absoluteURL
+        if isBundled { return bundledURL(url) }
+        return URL(string: url, relativeTo: eagleGalleryBaseURL)?.absoluteURL
+    }
+
+    private func bundledURL(_ name: String) -> URL? {
+        guard !name.isEmpty,
+              name == (name as NSString).lastPathComponent,
+              name.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-.").contains($0) }),
+              let root = Bundle.main.resourceURL else { return nil }
+        let resource = root.appendingPathComponent("EaglePrivateWallpapers", isDirectory: true)
+            .appendingPathComponent(name)
+        return FileManager.default.fileExists(atPath: resource.path) ? resource : nil
     }
 }
 
@@ -149,6 +201,51 @@ enum EagleWallpaperError: LocalizedError {
 
 private enum EagleWallpaperService {
     static func fetch(forceRefresh: Bool) async throws -> [EagleWallpaper] {
+        let bundled = try bundledWallpapers()
+        do {
+            let remote = try await fetchRemote(forceRefresh: forceRefresh)
+            let localIDs = Set(bundled.map(\.id))
+            return bundled + remote.filter { !localIDs.contains($0.id) }
+        } catch {
+            if !bundled.isEmpty { return bundled }
+            throw error
+        }
+    }
+
+    private static func bundledWallpapers() throws -> [EagleWallpaper] {
+        guard let url = Bundle.main.url(forResource: "catalog", withExtension: "json",
+                                        subdirectory: "EaglePrivateWallpapers") else { return [] }
+        let data = try Data(contentsOf: url)
+        guard data.count <= 1024 * 1024 else { throw EagleWallpaperError.invalidPackage }
+        struct Manifest: Decodable {
+            let schemaVersion: Int
+            let wallpapers: [EagleWallpaper]
+        }
+        let manifest = try JSONDecoder().decode(Manifest.self, from: data)
+        guard manifest.schemaVersion == 1, manifest.wallpapers.count <= 64,
+              Set(manifest.wallpapers.map(\.id)).count == manifest.wallpapers.count,
+              manifest.wallpapers.allSatisfy({ item in
+                  item.isBundled && !item.id.isEmpty &&
+                  item.id.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0) }) &&
+                  item.byteCount > 0 && item.byteCount <= TendiesInstaller.maximumCompressedSize &&
+                  (16...26).contains(item.minimumIOSMajor) &&
+                  item.sha256.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil &&
+                  item.downloadURL?.isFileURL == true &&
+                  item.previewURL?.isFileURL == true &&
+                  item.stillPreviewURL?.isFileURL == true &&
+                  item.motionPreviewURL?.isFileURL == true
+              }) else { throw EagleWallpaperError.invalidPackage }
+        return manifest.wallpapers
+    }
+
+    /// Still and motion previews may only come from Eagle-Gallery's wallpaper previews.
+    private static func isGalleryPreview(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        return url.scheme == "https" && url.host == "raw.githubusercontent.com" &&
+            url.path.hasPrefix("/leonardob8777-bit/Eagle-Gallery/main/previews/wallpapers/")
+    }
+
+    private static func fetchRemote(forceRefresh: Bool) async throws -> [EagleWallpaper] {
         var request = URLRequest(url: eagleWallpaperCatalogURL)
         request.timeoutInterval = 30
         if forceRefresh {
@@ -174,7 +271,9 @@ private enum EagleWallpaperService {
                   item.byteCount > 0 && item.byteCount <= TendiesInstaller.maximumCompressedSize &&
                   (16...26).contains(item.minimumIOSMajor) &&
                   item.sha256.range(of: "^[0-9a-fA-F]{64}$", options: .regularExpression) != nil &&
-                  item.downloadURL?.scheme == "https" && item.previewURL?.scheme == "https" &&
+                  !item.isBundled && item.downloadURL?.scheme == "https" && item.previewURL?.scheme == "https" &&
+                  (item.stillPreview == nil || isGalleryPreview(item.stillPreviewURL)) &&
+                  (item.motionPreview == nil || isGalleryPreview(item.motionPreviewURL)) &&
                   ((item.foregroundPreview == nil && item.foregroundSha256 == nil && item.foregroundByteCount == nil) ||
                    (item.foregroundPreviewURL?.scheme == "https" &&
                     item.foregroundPreviewURL?.host == "raw.githubusercontent.com" &&
@@ -187,11 +286,18 @@ private enum EagleWallpaperService {
 
     static func download(_ wallpaper: EagleWallpaper) async throws -> Data {
         guard let url = wallpaper.downloadURL else { throw URLError(.badURL) }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 120
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw EagleWallpaperError.invalidResponse
+        let data: Data
+        if wallpaper.isBundled {
+            guard url.isFileURL else { throw EagleWallpaperError.invalidPackage }
+            data = try Data(contentsOf: url, options: .mappedIfSafe)
+        } else {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 120
+            let (downloaded, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                throw EagleWallpaperError.invalidResponse
+            }
+            data = downloaded
         }
         guard data.count == wallpaper.byteCount,
               data.count <= TendiesInstaller.maximumCompressedSize,
@@ -220,6 +326,7 @@ final class WallpaperCatalogManager: ObservableObject {
 
         do {
             wallpapers = try await EagleWallpaperService.fetch(forceRefresh: forceRefresh)
+            EagleNewItems.shared.observe(.wallpaper, ids: wallpapers.filter(\.listed).map(\.id))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -228,7 +335,9 @@ final class WallpaperCatalogManager: ObservableObject {
 
     func install(_ wallpaper: EagleWallpaper) async {
         guard installingID == nil else { return }
-        guard laramgr.shared.sbxready else {
+        // Prepared access, or PosterBoard's saved UUID (Coconut's way, no preparing each time).
+        let prepared = laramgr.shared.sbxready
+        guard prepared || EaglePosterBoardUUID.allowsInstallWithoutPreparing else {
             resultMessage = LaraL10n.text(
                 en: "Prepare Eagle before installing a wallpaper.",
                 es: "Prepara el acceso de Eagle antes de instalar un fondo."
@@ -249,23 +358,33 @@ final class WallpaperCatalogManager: ObservableObject {
             let result = try await Task.detached(priority: .userInitiated) {
                 try TendiesInstaller.install(data: data)
             }.value
-            let refreshed = PosterBoardWriter.refreshCollections()
-            globallogger.log("(wallpaper) collection refresh requested, success=\(refreshed)")
+            // Coconut never refreshes collections or changes the language; Eagle keeps its refresh
+            // only on the prepared route, where it can write PosterBoard's preferences.
+            if prepared {
+                let refreshed = PosterBoardWriter.refreshCollections()
+                globallogger.log("(wallpaper) collection refresh requested, success=\(refreshed)")
+            }
             didInstall = true
-            if result.installedCount == 0, result.existingCount > 0 {
+            if !prepared {
+                // Saved-UUID route: the copy cannot be read back, so no "verified" claim (as Coconut).
                 resultMessage = LaraL10n.text(
-                    en: "\(wallpaper.name) is already imported. Open Wallpapers and select it; close Wallpapers from the app switcher if it does not appear immediately.",
-                    es: "\(wallpaper.name) ya está importado. Abre Fondos y selecciónalo; si no aparece de inmediato, cierra Fondos desde el selector de apps."
+                    en: "Eagle sent \(wallpaper.displayName) to Wallpapers. If it is not there yet, close Wallpapers from the app switcher and look in Collections.",
+                    es: "Eagle envió \(wallpaper.displayName) a Fondos. Si todavía no aparece, cierra Fondos desde el selector de apps y búscalo en Colecciones."
+                )
+            } else if result.installedCount == 0, result.existingCount > 0 {
+                resultMessage = LaraL10n.text(
+                    en: "\(wallpaper.displayName) is already imported. Open Wallpapers and select it; close Wallpapers from the app switcher if it does not appear immediately.",
+                    es: "\(wallpaper.displayName) ya está importado. Abre Fondos y selecciónalo; si no aparece de inmediato, cierra Fondos desde el selector de apps."
                 )
             } else if result.installedCount == 1 {
                 resultMessage = LaraL10n.text(
-                    en: "\(wallpaper.name) was imported and verified. Open Wallpapers and select it; close Wallpapers from the app switcher if it does not appear immediately.",
-                    es: "\(wallpaper.name) se importó y verificó. Abre Fondos y selecciónalo; si no aparece de inmediato, cierra Fondos desde el selector de apps."
+                    en: "\(wallpaper.displayName) was imported and verified. Open Wallpapers and select it; close Wallpapers from the app switcher if it does not appear immediately.",
+                    es: "\(wallpaper.displayName) se importó y verificó. Abre Fondos y selecciónalo; si no aparece de inmediato, cierra Fondos desde el selector de apps."
                 )
             } else {
                 resultMessage = LaraL10n.text(
-                    en: "Imported and verified \(result.installedCount) wallpapers from \(wallpaper.name). Open Wallpapers and select one.",
-                    es: "Se importaron y verificaron \(result.installedCount) fondos de \(wallpaper.name). Abre Fondos y selecciona uno."
+                    en: "Imported and verified \(result.installedCount) wallpapers from \(wallpaper.displayName). Open Wallpapers and select one.",
+                    es: "Se importaron y verificaron \(result.installedCount) fondos de \(wallpaper.displayName). Abre Fondos y selecciona uno."
                 )
             }
         } catch {
@@ -273,6 +392,12 @@ final class WallpaperCatalogManager: ObservableObject {
             resultMessage = error.localizedDescription
         }
         installingID = nil
+        // Read now: the screen shows and clears the result while this waits.
+        if didInstall {
+            // Like Coconut: let the move settle, then open the wallpaper gallery.
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            openWallpaperPicker()
+        }
     }
 
     @discardableResult
@@ -299,6 +424,8 @@ struct WallpaperGalleryView: View {
     let matchingWallpaperID: String?
     @ObservedObject private var gallery = WallpaperCatalogManager.shared
     @ObservedObject private var mgr = laramgr.shared
+    @ObservedObject private var likes = EagleLikes.shared
+    @ObservedObject private var newItems = EagleNewItems.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -314,42 +441,46 @@ struct WallpaperGalleryView: View {
 
     private var columns: [GridItem] {
         if dynamicTypeSize.isAccessibilitySize {
-            return [GridItem(.flexible())]
+            return [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
         }
         if horizontalSizeClass == .regular || verticalSizeClass == .compact {
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12),
-            ]
+            return [GridItem(.adaptive(minimum: 130), spacing: 14)]
         }
-        return [GridItem(.adaptive(minimum: 170), spacing: 12)]
+        return Array(repeating: GridItem(.flexible(), spacing: 14), count: 3)
     }
 
     private var displayedItems: [EagleWallpaper] {
         var items = gallery.wallpapers.filter(\.isCompatibleWithCurrentIOS)
         if let matchingWallpaperID {
             items = items.filter { $0.id == matchingWallpaperID }
+        } else {
+            items = items.filter(\.listed)
         }
         if showsFavoritesOnly {
             let favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
             items = items.filter { favoriteIDs.contains($0.id) }
         }
+        // Most liked first, in every section and in search results.
+        items = likes.sortedByLikes(items, .wallpaper, id: \.id)
         guard !searchText.isEmpty else { return items }
         let query = searchText.lowercased()
         return items.filter {
             $0.name.lowercased().contains(query) ||
+            $0.displayName.lowercased().contains(query) ||
             ($0.description ?? "").lowercased().contains(query) ||
             $0.authorLine.lowercased().contains(query)
         }
     }
 
+    /// The plain catalogue (no search, no favourites filter, not a single matching wallpaper) is laid
+    /// out as a showcase: one featured wallpaper, then the personal collection and Eagle's gallery.
+    private var showsShowcase: Bool {
+        matchingWallpaperID == nil && !showsFavoritesOnly && searchText.isEmpty
+    }
+
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                if !mgr.sbxready {
-                    LaraAccessView(compact: true)
-                }
-
+            LazyVStack(alignment: .leading, spacing: 22) {
                 if gallery.isLoading && gallery.wallpapers.isEmpty {
                     loadingView
                 } else if let error = gallery.errorMessage,
@@ -357,28 +488,11 @@ struct WallpaperGalleryView: View {
                     errorView(error)
                 } else if displayedItems.isEmpty {
                     emptyView
+                } else if showsShowcase {
+                    showcase
                 } else {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        let favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
-                        ForEach(displayedItems) { wallpaper in
-                            ZStack(alignment: .topTrailing) {
-                                NavigationLink {
-                                    EagleWallpaperDetail(wallpaper: wallpaper)
-                                } label: {
-                                    EagleWallpaperCard(wallpaper: wallpaper)
-                                }
-                                .buttonStyle(EaglePressableStyle())
-
-                                favoriteButton(
-                                    for: wallpaper,
-                                    favorite: favoriteIDs.contains(wallpaper.id)
-                                )
-                                    .padding(6)
-                            }
-                        }
-                    }
+                    grid(displayedItems)
                 }
-
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 36)
@@ -392,6 +506,9 @@ struct WallpaperGalleryView: View {
             if gallery.wallpapers.isEmpty {
                 await gallery.load()
             }
+        }
+        .task {
+            await EagleLikes.shared.refresh(.wallpaper, favorites: EagleWallpaperFavorites.decode(favoriteIDsJSON))
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -410,34 +527,102 @@ struct WallpaperGalleryView: View {
         }
     }
 
+    @ViewBuilder
+    private var showcase: some View {
+        let items = displayedItems
+        let personal = items.filter(\.isPersonal)
+        let eagle = items.filter { !$0.isPersonal }
+
+        if !personal.isEmpty {
+            section(LaraL10n.text(en: "Personal collection", es: "Colección personal"), personal)
+        }
+        if !eagle.isEmpty {
+            section(LaraL10n.text(en: "Eagle Gallery", es: "Galería Eagle"), eagle)
+        }
+    }
+
+    private func section(_ title: String, _ items: [EagleWallpaper]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.title3.weight(.bold))
+                Spacer()
+                Text("\(items.count)")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            .eagleBackdropText()
+            .padding(.horizontal, 4)
+            grid(items)
+        }
+    }
+
+    private func grid(_ items: [EagleWallpaper]) -> some View {
+        LazyVGrid(columns: columns, alignment: .center, spacing: 22) {
+            let favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
+            // One HOT tag for the whole gallery: the most liked wallpaper on screen.
+            let hotID = likes.hottest(.wallpaper, among: displayedItems.map(\.id))
+            ForEach(items) { wallpaper in
+                let favorite = favoriteIDs.contains(wallpaper.id)
+                VStack(spacing: 8) {
+                    NavigationLink {
+                        EagleWallpaperDetail(wallpaper: wallpaper)
+                    } label: {
+                        EaglePhoneFrame(wallpaper: wallpaper)
+                    }
+                    .buttonStyle(EaglePressableStyle())
+                    .contextMenu {
+                        Button {
+                            toggleFavorite(wallpaper)
+                        } label: {
+                            Label(
+                                favorite
+                                    ? LaraL10n.text(en: "Remove like", es: "Quitar me gusta")
+                                    : LaraL10n.text(en: "Like", es: "Me gusta"),
+                                systemImage: favorite ? "heart.slash" : "heart"
+                            )
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if wallpaper.id == hotID {
+                                EagleHotBadge()
+                                    .transition(.scale(scale: 0.7).combined(with: .opacity))
+                            }
+                            if newItems.isNew(.wallpaper, wallpaper.id) {
+                                EagleNewBadge()
+                            }
+                        }
+                        .padding(.top, 10)
+                        .padding(.leading, 9)
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        EagleLikeButton(kind: .wallpaper, id: wallpaper.id, isLiked: favorite) {
+                            toggleFavorite(wallpaper)
+                        }
+                        .padding(2)
+                    }
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: hotID)
+
+                    Text(wallpaper.displayName)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .eagleBackdropText()
+                }
+            }
+        }
+    }
+
     private func toggleFavorite(_ wallpaper: EagleWallpaper) {
         var favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
-        if !favoriteIDs.insert(wallpaper.id).inserted {
+        let liked = favoriteIDs.insert(wallpaper.id).inserted
+        if !liked {
             favoriteIDs.remove(wallpaper.id)
         }
         favoriteIDsJSON = EagleWallpaperFavorites.encode(favoriteIDs)
+        EagleLikes.shared.setLiked(.wallpaper, wallpaper.id, liked: liked)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-
-    private func favoriteButton(
-        for wallpaper: EagleWallpaper,
-        favorite: Bool
-    ) -> some View {
-        return Button {
-            toggleFavorite(wallpaper)
-        } label: {
-            Image(systemName: favorite ? "heart.fill" : "heart")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(favorite ? Color.pink : Color.primary)
-                .eagleSymbolPop(favorite)
-                .frame(width: 44, height: 44)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-        .buttonStyle(EaglePressableStyle(kind: .swatch))
-        .accessibilityLabel(favorite
-            ? LaraL10n.text(en: "Remove from favorites", es: "Quitar de favoritos")
-            : LaraL10n.text(en: "Add to favorites", es: "Agregar a favoritos"))
-        .accessibilityValue(wallpaper.name)
     }
 
     private var loadingView: some View {
@@ -532,12 +717,15 @@ struct WallpaperGalleryView: View {
 private struct EagleWallpaperArtwork: View {
     let wallpaper: EagleWallpaper
     let contentMode: ContentMode
+    var animated = false
 
     var body: some View {
         ZStack {
+            // Thumbnails use the light still image; the animated preview (a few MB) only when the
+            // wallpaper is open.
             LaraRemoteMediaPreview(
-                url: wallpaper.previewURL,
-                animated: false,
+                url: animated ? wallpaper.previewURL : (wallpaper.stillPreviewURL ?? wallpaper.previewURL),
+                animated: animated,
                 contentMode: contentMode,
                 showsRetry: false
             )
@@ -553,41 +741,15 @@ private struct EagleWallpaperArtwork: View {
     }
 }
 
-private struct EagleWallpaperCard: View {
+/// The previews are whole lock-screen captures (clock, island and all), so they are shown as a
+/// complete iPhone at the screen's own proportions: never cropped, nothing laid over them.
+private struct EaglePhoneFrame: View {
     let wallpaper: EagleWallpaper
+    var animated = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            EagleWallpaperArtwork(wallpaper: wallpaper, contentMode: .fill)
-            .frame(maxWidth: .infinity)
-            .frame(height: 205)
-            .clipped()
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(wallpaper.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-
-                Text(wallpaper.authorLine)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if wallpaper.minimumIOSMajor >= 26 {
-                    Text("iOS \(wallpaper.minimumIOSMajor)")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.orange)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-        }
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.primary.opacity(0.07), lineWidth: 1)
+        EagleDeviceFrame {
+            EagleWallpaperArtwork(wallpaper: wallpaper, contentMode: .fill, animated: animated)
         }
     }
 }
@@ -599,7 +761,14 @@ private struct EagleWallpaperDetail: View {
     @ObservedObject private var mgr = laramgr.shared
     @AppStorage(EagleWallpaperFavorites.storageKey)
     private var favoriteIDsJSON = "[]"
+    /// Observed so Add appears as soon as PosterBoard's UUID is saved.
+    @AppStorage(EaglePosterBoardUUID.storageKey) private var savedPosterBoardUUID = ""
     @State private var isPreparingDownload = false
+
+    /// Prepared access, or PosterBoard's saved UUID: Prepare is only needed while neither exists.
+    private var canInstall: Bool {
+        mgr.sbxready || (!savedPosterBoardUUID.isEmpty && EaglePosterBoardUUID.allowsInstallWithoutPreparing)
+    }
     @State private var shareImage: EagleWallpaperShareImage?
 
     private var isInstalling: Bool {
@@ -615,34 +784,60 @@ private struct EagleWallpaperDetail: View {
     }
 
     var body: some View {
+        content
+            // Opened: no longer news.
+            .onAppear { EagleNewItems.shared.markSeen(.wallpaper, wallpaper.id) }
+    }
+
+    private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 18) {
                 if wallpaper.previewURL != nil {
-                    EagleWallpaperArtwork(wallpaper: wallpaper, contentMode: .fit)
-                        .aspectRatio(9.0 / 16.0, contentMode: .fit)
-                        .frame(maxWidth: 340)
+                    EaglePhoneFrame(wallpaper: wallpaper, animated: true)
+                        .frame(maxWidth: 220)
                         .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                        .background(Color.black, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                        .padding(.top, 8)
                 }
 
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(wallpaper.name)
-                        .font(.title2.bold())
-                    Text(wallpaper.authorLine)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    if let description = wallpaper.description, !description.isEmpty {
-                        Text(description)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+                // Name on the left, the two secondary actions as small round buttons on the right.
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(wallpaper.displayName)
+                            .font(.title3.weight(.bold))
+                            .lineLimit(1)
+                        Text(wallpaper.contest.flatMap { $0.isEmpty ? nil : $0 } ?? wallpaper.authorLine)
+                            .font(.footnote.weight(.medium))
+                            .opacity(0.6)
+                            .lineLimit(1)
                     }
-                    if let contest = wallpaper.contest, !contest.isEmpty {
-                        Text(contest)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.orange)
+                    .eagleBackdropText()
+
+                    Spacer(minLength: 8)
+
+                    EagleLikeButton(kind: .wallpaper, id: wallpaper.id, isLiked: isFavorite, onArtwork: false) {
+                        toggleLike()
                     }
+
+                    if let movie = wallpaper.motionPreviewURL {
+                        NavigationLink {
+                            EagleWallpaperVideoPreview(url: movie, title: wallpaper.displayName)
+                        } label: {
+                            EagleRoundAction(systemImage: "play.fill")
+                        }
+                        .buttonStyle(EaglePressableStyle(kind: .swatch))
+                        .accessibilityLabel(LaraL10n.text(en: "Watch video preview", es: "Ver video de muestra"))
+                    }
+
+                    Button {
+                        Task { await downloadImageForSharing() }
+                    } label: {
+                        EagleRoundAction(systemImage: "arrow.down.to.line", busy: isPreparingDownload)
+                    }
+                    .buttonStyle(EaglePressableStyle(kind: .swatch))
+                    .disabled(isPreparingDownload)
+                    .accessibilityLabel(LaraL10n.text(en: "Save or share image", es: "Guardar o compartir imagen"))
                 }
+                .padding(.horizontal, 4)
 
                 if isIncompatible {
                     Label(
@@ -658,34 +853,13 @@ private struct EagleWallpaperDetail: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-
-                Text(LaraL10n.text(
-                    en: "Eagle imports a local copy. Select it in Wallpapers after installation.",
-                    es: "Eagle importa una copia local. Selecciónala en Fondos después de instalarla."
-                ))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Button {
-                    Task { await downloadImageForSharing() }
-                } label: {
-                    Label(
-                        isPreparingDownload
-                            ? LaraL10n.text(en: "Downloading image…", es: "Descargando imagen…")
-                            : LaraL10n.text(en: "Save or share image", es: "Guardar o compartir imagen"),
-                        systemImage: "square.and.arrow.down"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(EagleSecondaryButtonStyle())
-                .disabled(isPreparingDownload)
             }
-            .padding(20)
+            .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
         // "Add to Wallpapers" stays fixed at the bottom; Prepare takes its place until Eagle is ready.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            EagleApplyBar(ready: mgr.sbxready) {
+            EagleApplyBar(ready: canInstall) {
                 Button {
                     Task { await gallery.install(wallpaper) }
                 } label: {
@@ -702,31 +876,12 @@ private struct EagleWallpaperDetail: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(EagleApplyButtonStyle(busy: isInstalling))
-                .disabled(!mgr.sbxready || gallery.installingID != nil || isIncompatible)
+                .disabled(!canInstall || gallery.installingID != nil || isIncompatible)
             }
         }
         .eagleScreenBackdrop()
-        .navigationTitle("Vista previa")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    var favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
-                    if !favoriteIDs.insert(wallpaper.id).inserted {
-                        favoriteIDs.remove(wallpaper.id)
-                    }
-                    favoriteIDsJSON = EagleWallpaperFavorites.encode(favoriteIDs)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    Image(systemName: isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(isFavorite ? Color.pink : Color.primary)
-                }
-                .accessibilityLabel(isFavorite
-                    ? LaraL10n.text(en: "Remove from favorites", es: "Quitar de favoritos")
-                    : LaraL10n.text(en: "Add to favorites", es: "Agregar a favoritos"))
-                .accessibilityValue(wallpaper.name)
-            }
-        }
         .onChange(of: gallery.resultMessage) { value in
             guard let value else { return }
             let installed = gallery.didInstall
@@ -741,17 +896,35 @@ private struct EagleWallpaperDetail: View {
         }
     }
 
+    private func toggleLike() {
+        var favoriteIDs = EagleWallpaperFavorites.decode(favoriteIDsJSON)
+        let liked = favoriteIDs.insert(wallpaper.id).inserted
+        if !liked {
+            favoriteIDs.remove(wallpaper.id)
+        }
+        favoriteIDsJSON = EagleWallpaperFavorites.encode(favoriteIDs)
+        EagleLikes.shared.setLiked(.wallpaper, wallpaper.id, liked: liked)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
     @MainActor
     private func downloadImageForSharing() async {
         guard !isPreparingDownload else { return }
         isPreparingDownload = true
         defer { isPreparingDownload = false }
         do {
-            guard let url = wallpaper.previewURL,
-                  url.scheme == "https",
-                  url.host == "raw.githubusercontent.com",
-                  url.path.hasPrefix("/leonardob8777-bit/Eagle-Gallery/main/previews/wallpapers/") else {
+            // The still image when there is one: the preview itself may be an animated GIF.
+            guard let url = wallpaper.stillPreviewURL ?? wallpaper.previewURL else {
                 throw URLError(.badURL)
+            }
+            if wallpaper.isBundled {
+                guard url.isFileURL else { throw URLError(.badURL) }
+            } else {
+                guard url.scheme == "https",
+                      url.host == "raw.githubusercontent.com",
+                      url.path.hasPrefix("/leonardob8777-bit/Eagle-Gallery/main/previews/wallpapers/") else {
+                    throw URLError(.badURL)
+                }
             }
             let backgroundData = try await downloadPNG(from: url)
             guard let background = UIImage(data: backgroundData) else {
@@ -798,17 +971,66 @@ private struct EagleWallpaperDetail: View {
     }
 
     private func downloadPNG(from url: URL) async throws -> Data {
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 30
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse,
-              http.statusCode == 200,
-              data.count <= 20 * 1024 * 1024,
+        let data: Data
+        if url.isFileURL {
+            data = try Data(contentsOf: url, options: .mappedIfSafe)
+        } else {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 30
+            let (downloaded, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                throw EagleWallpaperError.invalidResponse
+            }
+            data = downloaded
+        }
+        guard data.count <= 20 * 1024 * 1024,
               data.starts(with: [0x89, 0x50, 0x4E, 0x47]),
               UIImage(data: data) != nil else {
             throw EagleWallpaperError.invalidResponse
         }
         return data
+    }
+}
+
+/// A secondary action as a small round button.
+private struct EagleRoundAction: View {
+    let systemImage: String
+    var busy = false
+
+    var body: some View {
+        ZStack {
+            if busy {
+                ProgressView()
+            } else {
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.bold))
+            }
+        }
+        .foregroundStyle(.primary)
+        .frame(width: 44, height: 44)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Circle())
+        .overlay { Circle().strokeBorder(Color.primary.opacity(0.07), lineWidth: 1) }
+    }
+}
+
+private struct EagleWallpaperVideoPreview: View {
+    let url: URL
+    let title: String
+    @State private var player: AVPlayer
+
+    init(url: URL, title: String) {
+        self.url = url
+        self.title = title
+        _player = State(initialValue: AVPlayer(url: url))
+    }
+
+    var body: some View {
+        VideoPlayer(player: player)
+            .background(Color.black)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear { player.play() }
+            .onDisappear { player.pause() }
     }
 }
 

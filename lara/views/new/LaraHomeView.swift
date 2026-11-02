@@ -2,6 +2,10 @@ import SwiftUI
 
 struct LaraHomeView: View {
     @ObservedObject private var mgr = laramgr.shared
+    /// NEW on Wallpapers and Passcode only while their galleries hold something really new.
+    @ObservedObject private var newItems = EagleNewItems.shared
+    /// NEW on each option this version of Eagle changed, until it is opened.
+    @ObservedObject private var releaseNews = EagleReleaseNews.shared
     @AppStorage(LaraLanguage.storageKey) private var language = LaraLanguage.english
     @AppStorage("eagle.home.homeLabelColor.beta10Seen")
     private var hasSeenHomeLabelColorBeta10 = false
@@ -56,7 +60,7 @@ struct LaraHomeView: View {
                                     .accessibilityAddTraits(.isHeader)
 
                                 VStack(spacing: 0) {
-                                    NavigationLink(destination: islandGalleryDestination) {
+                                    NavigationLink(destination: islandGalleryDestination.onAppear { releaseNews.markSeen("islandGallery") }) {
                                         LaraToolRow(
                                             title: LaraL10n.text(en: "Island Gallery", es: "Galería Island"),
                                             subtitle: LaraL10n.text(
@@ -65,13 +69,13 @@ struct LaraHomeView: View {
                                             ),
                                             systemImage: "capsule.fill",
                                             accent: Color(red: 0.69, green: 0.32, blue: 0.87),
-                                            badge: hasSeenIslandGallery ? nil : LaraL10n.text(en: "NEW", es: "NUEVO")
+                                            badge: newBadge(.islandGallery, !hasSeenIslandGallery)
                                         )
                                     }
 
                                     Divider().padding(.leading, 65)
 
-                                    NavigationLink(destination: dockGalleryDestination) {
+                                    NavigationLink(destination: dockGalleryDestination.onAppear { releaseNews.markSeen("dockGallery") }) {
                                         LaraToolRow(
                                             title: LaraL10n.text(en: "Dock Gallery", es: "Galería Dock"),
                                             subtitle: LaraL10n.text(
@@ -80,7 +84,7 @@ struct LaraHomeView: View {
                                             ),
                                             systemImage: "dock.rectangle",
                                             accent: Color(red: 1.00, green: 0.18, blue: 0.62),
-                                            badge: hasSeenDockGallery ? nil : LaraL10n.text(en: "NEW", es: "NUEVO")
+                                            badge: newBadge(.dockGallery, !hasSeenDockGallery)
                                         )
                                     }
 
@@ -92,57 +96,61 @@ struct LaraHomeView: View {
                                             subtitle: LaraL10n.text(en: "System visibility", es: "Visibilidad del sistema"),
                                             systemImage: "eye.slash.fill",
                                             accent: .indigo,
-                                            badge: hasSeenHideSurfaces ? nil : LaraL10n.text(en: "NEW", es: "NUEVO")
+                                            badge: newBadge(.hideSurfaces, !hasSeenHideSurfaces)
                                         )
                                     }
 
                                     Divider().padding(.leading, 65)
 
-                                    NavigationLink(destination: AnimatedWallpapersView()) {
+                                    NavigationLink(destination: AnimatedWallpapersView().onAppear { releaseNews.markSeen("wallpapers") }) {
                                     LaraToolRow(
                                         title: LaraL10n.text(en: "Wallpapers", es: "Fondos"),
                                         subtitle: LaraL10n.text(en: "Explore or create", es: "Explora o crea"),
                                         systemImage: "photo.on.rectangle.angled",
-                                        accent: Color(red: 0.34, green: 0.31, blue: 0.88)
+                                        accent: Color(red: 0.34, green: 0.31, blue: 0.88),
+                                        badge: newBadge(.wallpapers, newItems.hasNew(.wallpaper))
                                     )
                                 }
 
                                     Divider().padding(.leading, 65)
 
-                                    NavigationLink(destination: PasscodeView(mgr: mgr)) {
+                                    NavigationLink(destination: PasscodeView(mgr: mgr).onAppear { releaseNews.markSeen("passcode") }) {
                                         LaraToolRow(
                                             title: LaraL10n.text(en: "Passcode", es: "Código"),
                                             subtitle: LaraL10n.text(en: "Unlock key styles", es: "Números de desbloqueo"),
                                             systemImage: "circle.grid.3x3.fill",
-                                            accent: Color(red: 0.56, green: 0.28, blue: 0.72)
+                                            accent: Color(red: 0.56, green: 0.28, blue: 0.72),
+                                            badge: newBadge(.passcode, newItems.hasNew(.passcode))
                                         )
                                     }
 
                                     Divider().padding(.leading, 65)
 
-                                    NavigationLink(destination: CardView()) {
+                                    NavigationLink(destination: CardView().onAppear { releaseNews.markSeen("cards") }) {
                                         LaraToolRow(
                                             title: LaraL10n.text(en: "Cards", es: "Tarjetas"),
                                             subtitle: LaraL10n.text(en: "Wallet design", es: "Diseño de Wallet"),
                                             systemImage: "creditcard.fill",
-                                            accent: Color(red: 0.08, green: 0.48, blue: 0.52)
+                                            accent: Color(red: 0.08, green: 0.48, blue: 0.52),
+                                            badge: newBadge(.cards)
                                         )
                                     }
 
                                     Divider().padding(.leading, 65)
 
-                                    NavigationLink(destination: DockCustomizerView()) {
+                                    NavigationLink(destination: DockCustomizerView().onAppear { releaseNews.markSeen("dock") }) {
                                         LaraToolRow(
                                             title: "Dock",
                                             subtitle: LaraL10n.text(en: "Fit up to six apps", es: "Hasta seis apps"),
                                             systemImage: "dock.rectangle",
-                                            accent: Color(red: 0.12, green: 0.46, blue: 0.86)
+                                            accent: Color(red: 0.12, green: 0.46, blue: 0.86),
+                                            badge: newBadge(.dock)
                                         )
                                     }
 
                                     Divider().padding(.leading, 65)
 
-                                    NavigationLink(destination: homeLabelColorDestination) {
+                                    NavigationLink(destination: homeLabelColorDestination.onAppear { releaseNews.markSeen("homeLabelColor") }) {
                                         LaraToolRow(
                                             title: LaraL10n.text(en: "App Name Color", es: "Color de nombres"),
                                             subtitle: LaraL10n.text(
@@ -151,29 +159,10 @@ struct LaraHomeView: View {
                                             ),
                                             systemImage: "textformat",
                                             accent: Color(red: 0.36, green: 0.30, blue: 0.88),
-                                            badge: hasSeenHomeLabelColorBeta10 ? nil : LaraL10n.text(en: "NEW", es: "NUEVO")
+                                            badge: newBadge(.homeLabelColor, !hasSeenHomeLabelColorBeta10)
                                         )
                                     }
 
-                                    Divider().padding(.leading, 65)
-
-                                    LaraToolRow(
-                                        title: LaraL10n.text(en: "Icon Studio", es: "Icon Studio"),
-                                        subtitle: LaraL10n.text(
-                                            en: "Themes and custom shapes",
-                                            es: "Temas y formas personalizadas"
-                                        ),
-                                        systemImage: "square.grid.2x2.fill",
-                                        accent: Color(red: 0.18, green: 0.60, blue: 0.42),
-                                        badge: LaraL10n.text(en: "SOON", es: "PRÓXIMAMENTE"),
-                                        badgeIsMuted: true,
-                                        showsDisclosureIndicator: false
-                                    )
-                                    .opacity(0.62)
-                                    .accessibilityHint(LaraL10n.text(
-                                        en: "Icon Studio is coming soon",
-                                        es: "Icon Studio estará disponible próximamente"
-                                    ))
                                 }
                                 .buttonStyle(EaglePressableStyle(kind: .row))
                                 .background(Color(uiColor: .secondarySystemGroupedBackground))
@@ -184,7 +173,7 @@ struct LaraHomeView: View {
                                 }
                             }
 
-                            NavigationLink(destination: CompleteStylesView()) {
+                            NavigationLink(destination: CompleteStylesView().onAppear { releaseNews.markSeen("completeStyles") }) {
                                 LaraFeatureCard(
                                     title: LaraL10n.text(en: "Styles", es: "Estilos"),
                                     subtitle: LaraL10n.text(
@@ -192,8 +181,10 @@ struct LaraHomeView: View {
                                         es: "Un aspecto completo para el fondo, el código y tu tarjeta."
                                     ),
                                     systemImage: "sparkles",
-                                    accent: Color(red: 0.33, green: 0.25, blue: 0.82),
-                                    artwork: .styles
+                                    // Black and white like Eagle's mark; the iPhones bring the colour.
+                                    accent: .primary,
+                                    artwork: .styles,
+                                    badge: newBadge(.completeStyles)
                                 )
                             }
                             .buttonStyle(EaglePressableStyle())
@@ -217,6 +208,11 @@ struct LaraHomeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .eagleRootNavigationBar()
             .eagleStatusBarVeil()
+            // The two catalogs are read once at launch, so NEW shows here before the galleries open.
+            .task {
+                await WallpaperCatalogManager.shared.load()
+                await PasscodeGalleryManager.shared.loadThemes()
+            }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
                     .environmentObject(mgr)
@@ -500,7 +496,7 @@ struct LaraHomeView: View {
         LaraHomeToolRoute.allCases.filter { route in
             switch route {
             case .auraStudio, .completeStyles, .wallpapers,
-                    .homeLabelColor, .cards, .passcode, .icons, .dock,
+                    .homeLabelColor, .cards, .passcode, .dock,
                     .islandGallery, .dockGallery, .hideSurfaces:
                 return true
             case .advancedSettings:
@@ -626,16 +622,10 @@ struct LaraHomeView: View {
     private func searchResult(for route: LaraHomeToolRoute) -> some View {
         if route == .advancedSettings {
             Button { showingSettings = true } label: { toolSearchRow(for: route) }
-        } else if route == .icons {
-            toolSearchRow(for: route)
-                .opacity(0.62)
-                .accessibilityHint(LaraL10n.text(
-                    en: "Icon Studio is coming soon",
-                    es: "Icon Studio estará disponible próximamente"
-                ))
         } else {
             NavigationLink {
                 toolDestination(for: route)
+                    .onAppear { releaseNews.markSeen(route.rawValue) }
             } label: {
                 toolSearchRow(for: route)
             }
@@ -652,16 +642,19 @@ struct LaraHomeView: View {
             subtitle: route.subtitle,
             systemImage: route.systemImage,
             accent: route.accent,
-            badge: route == .icons
-                ? LaraL10n.text(en: "SOON", es: "PRÓXIMAMENTE")
-                : ((route == .islandGallery && !hasSeenIslandGallery) ||
-                   (route == .dockGallery && !hasSeenDockGallery) ||
-                   (route == .hideSurfaces && !hasSeenHideSurfaces) ||
-                   (route == .homeLabelColor && !hasSeenHomeLabelColorBeta10)
-                    ? LaraL10n.text(en: "NEW", es: "NUEVO") : nil),
-            badgeIsMuted: route == .icons,
-            showsDisclosureIndicator: route != .icons
+            badge: newBadge(route, (route == .islandGallery && !hasSeenIslandGallery) ||
+                (route == .dockGallery && !hasSeenDockGallery) ||
+                (route == .hideSurfaces && !hasSeenHideSurfaces) ||
+                (route == .homeLabelColor && !hasSeenHomeLabelColorBeta10) ||
+                (route == .wallpapers && newItems.hasNew(.wallpaper)) ||
+                (route == .passcode && newItems.hasNew(.passcode)))
         )
+    }
+
+    /// NEW when this version brought something to the option, or when `also` holds (new gallery items,
+    /// or an older version's news not opened yet).
+    private func newBadge(_ route: LaraHomeToolRoute, _ also: Bool = false) -> String? {
+        releaseNews.isNew(route.rawValue) || also ? LaraL10n.text(en: "NEW", es: "NUEVO") : nil
     }
 
     @ViewBuilder
@@ -679,8 +672,6 @@ struct LaraHomeView: View {
             CardView()
         case .passcode:
             PasscodeView(mgr: mgr)
-        case .icons:
-            DarkBoardView()
         case .dock:
             DockCustomizerView()
         case .islandGallery:
@@ -741,7 +732,6 @@ private enum LaraHomeToolRoute: String, CaseIterable, Identifiable {
     case dockGallery
     case hideSurfaces
     case advancedSettings
-    case icons
 
     var id: String { rawValue }
 
@@ -754,7 +744,6 @@ private enum LaraHomeToolRoute: String, CaseIterable, Identifiable {
             return LaraL10n.text(en: "App Name Color", es: "Color de nombres")
         case .cards: return LaraL10n.text(en: "Cards", es: "Tarjetas")
         case .passcode: return LaraL10n.text(en: "Passcode", es: "Código")
-        case .icons: return "Icon Studio"
         case .dock: return "Dock"
         case .islandGallery:
             return LaraL10n.text(en: "Island Gallery", es: "Galería Island")
@@ -787,8 +776,6 @@ private enum LaraHomeToolRoute: String, CaseIterable, Identifiable {
             return LaraL10n.text(en: "Wallet design", es: "Diseño de Wallet")
         case .passcode:
             return LaraL10n.text(en: "Unlock key styles", es: "Números de desbloqueo")
-        case .icons:
-            return LaraL10n.text(en: "Themes and Android shapes", es: "Temas y formas Android")
         case .dock:
             return LaraL10n.text(en: "Fit up to six apps", es: "Hasta seis apps")
         case .islandGallery:
@@ -814,7 +801,6 @@ private enum LaraHomeToolRoute: String, CaseIterable, Identifiable {
         case .homeLabelColor: return "textformat"
         case .cards: return "creditcard.fill"
         case .passcode: return "circle.grid.3x3.fill"
-        case .icons: return "square.grid.2x2.fill"
         case .dock: return "dock.rectangle"
         case .islandGallery: return "capsule.fill"
         case .dockGallery: return "dock.rectangle"
@@ -832,7 +818,6 @@ private enum LaraHomeToolRoute: String, CaseIterable, Identifiable {
         case .homeLabelColor: return Color(red: 0.36, green: 0.30, blue: 0.88)
         case .cards: return Color(red: 0.08, green: 0.48, blue: 0.52)
         case .passcode: return Color(red: 0.56, green: 0.28, blue: 0.72)
-        case .icons: return Color(red: 0.18, green: 0.60, blue: 0.42)
         case .dock: return Color(red: 0.12, green: 0.46, blue: 0.86)
         case .islandGallery: return Color(red: 0.69, green: 0.32, blue: 0.87)
         case .dockGallery: return Color(red: 1.00, green: 0.18, blue: 0.62)
@@ -851,7 +836,6 @@ private enum LaraHomeToolRoute: String, CaseIterable, Identifiable {
             return "text color label labels name names texto color nombre nombres home inicio solid sólido"
         case .cards: return "card cards tarjeta tarjetas wallet"
         case .passcode: return "passcode code código unlock desbloqueo key keys números"
-        case .icons: return "icon icons icono iconos theme themes tema temas android shape formas"
         case .dock: return "dock apps icons iconos capacity capacidad"
         case .islandGallery:
             return "island isla gallery galería live static saves themes temas shadow sombra"
@@ -996,58 +980,35 @@ private struct LaraFeatureCard: View {
         }
     }
 
+    /// Three real iPhones fanned out: a passcode style on the left, wallpapers in the middle and on
+    /// the right, all from Eagle-Gallery (the gallery's light still images, nothing bundled).
     private var stylesArtwork: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 25, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [accent.opacity(0.72), accent, Color.indigo.opacity(0.88)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 104, height: 138)
-                .overlay(alignment: .top) {
-                    VStack(spacing: 1) {
-                        Text("9:41")
-                            .font(.system(size: 27, weight: .semibold, design: .rounded))
-                        HStack(spacing: 5) {
-                            ForEach(1..<4) { number in
-                                Circle()
-                                    .fill(.white.opacity(0.18))
-                                    .frame(width: 18, height: 18)
-                                    .overlay {
-                                        Text("\(number)")
-                                            .font(.system(size: 6, weight: .bold))
-                                    }
-                            }
-                        }
-                        .padding(.top, 15)
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.top, 20)
-                }
-                .rotationEffect(.degrees(-5))
-
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.black.opacity(0.9), accent, Color.cyan.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 150, height: 94)
-                .overlay(alignment: .topLeading) {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(.primary)
-                        .padding(14)
-                }
-                .rotationEffect(.degrees(5))
-                .offset(x: 72, y: 30)
-                .shadow(color: accent.opacity(0.25), radius: 16, y: 8)
+        let previews = "https://raw.githubusercontent.com/leonardob8777-bit/Eagle-Gallery/main/previews/"
+        return HStack(alignment: .center, spacing: -24) {
+            coverPhone(previews + "passcode/applicable-v3/orbit.png")
+                .rotationEffect(.degrees(-9))
+                .offset(y: 12)
+            coverPhone(previews + "wallpapers/hora-dorada.png")
+                .scaleEffect(1.1)
+                .zIndex(1)
+            coverPhone(previews + "wallpapers/avion-azul.png")
+                .rotationEffect(.degrees(9))
+                .offset(y: 12)
         }
-        .offset(x: -28)
+        .padding(.top, 14)
+    }
+
+    private func coverPhone(_ address: String) -> some View {
+        EagleDeviceFrame {
+            LaraRemoteMediaPreview(
+                url: URL(string: address),
+                animated: false,
+                contentMode: .fill,
+                showsRetry: false
+            )
+        }
+        .frame(width: 64)
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
     }
 
     private var wallpaperArtwork: some View {

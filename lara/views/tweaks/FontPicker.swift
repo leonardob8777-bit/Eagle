@@ -159,7 +159,7 @@ struct FontPicker: View {
                                 }
                                 let success = mgr.vfsoverwritefromlocalpath(target: selectedTarget.path, source: font.path)
                                 success ? mgr.logmsg("font changed to \(font.name)") : mgr.logmsg("failed to change font")
-                                EagleNotifications.shared.result(success, title: "Fonts", message: success
+                                EagleNotifications.shared.result(success, title: LaraL10n.text(en: "Fonts", es: "Fuentes"), message: success
                                     ? LaraL10n.text(en: "Font applied", es: "Fuente aplicada")
                                     : LaraL10n.text(en: "Could not apply the font", es: "No se pudo aplicar la fuente"))
                             } label: {
@@ -529,7 +529,7 @@ struct repofontrow: View {
                     source: localurl.path
                 )
                 success ? mgr.logmsg("font changed to \(font.name)") : mgr.logmsg("failed to change font")
-                EagleNotifications.shared.result(success, title: "Fonts", message: success
+                EagleNotifications.shared.result(success, title: LaraL10n.text(en: "Fonts", es: "Fuentes"), message: success
                     ? LaraL10n.text(en: "Font applied", es: "Fuente aplicada")
                     : LaraL10n.text(en: "Could not apply the font", es: "No se pudo aplicar la fuente"))
             } else {
@@ -571,7 +571,7 @@ private struct repoemojirow: View {
         		}
                 let success = mgr.vfsoverwritefromlocalpath(target: emojipath, source: localurl.path)
                 success ? mgr.logmsg("emoji changed to \(emoji.name)") : mgr.logmsg("failed to change emojis")
-                EagleNotifications.shared.result(success, title: "Emoji", message: success
+                EagleNotifications.shared.result(success, title: LaraL10n.text(en: "Emoji", es: "Emoji"), message: success
                     ? LaraL10n.text(en: "Emoji applied", es: "Emoji aplicados")
                     : LaraL10n.text(en: "Could not apply the emoji", es: "No se pudieron aplicar los emoji"))
             } else {

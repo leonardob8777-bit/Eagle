@@ -264,38 +264,10 @@ struct EagleWordmark: View {
 /// wordmark on the left, the language and settings controls together on the
 /// right at the same level, and the device-identity pill fixed on the line
 /// directly below the wordmark.
-/// The backdrop switch's look: system size and motion, in black and white. While it is on, the
-/// backdrop's top (the inverse of the appearance) is behind it, so the track takes the appearance's
-/// background colour and the knob its text colour; while it is off, the usual grey track and white
-/// knob. The knob stretches under the finger like a system switch.
-private struct EagleBackdropSwitchStyle: ButtonStyle {
-    let isOn: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        ZStack(alignment: isOn ? .trailing : .leading) {
-            Capsule()
-                .fill(isOn ? EagleVisualTheme.actionText : Color(uiColor: .systemFill))
-            Capsule()
-                .fill(isOn ? EagleVisualTheme.actionFill : Color.white)
-                .frame(width: configuration.isPressed ? 33 : 27, height: 27)
-                .shadow(color: .black.opacity(0.2), radius: 2.5, y: 1.5)
-                .padding(2)
-        }
-        .frame(width: 51, height: 31)
-        .frame(height: 44)
-        .contentShape(Rectangle())
-        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: isOn)
-        .animation(.spring(response: 0.24, dampingFraction: 0.8), value: configuration.isPressed)
-    }
-}
-
 struct EagleHeaderBar: View {
     @Binding var language: LaraLanguage
-    /// Access shows the backdrop switch under Settings; Customize does not.
-    var showsBackdropToggle = false
     var onSettings: () -> Void
 
-    @AppStorage(EagleBackdrop.storageKey) private var backdropEnabled = true
     @State private var gearTurns = 0.0
     @State private var wordmarkHop = false
     @State private var readyRingScale: CGFloat = 1
@@ -324,40 +296,12 @@ struct EagleHeaderBar: View {
             HStack(alignment: .center, spacing: 10) {
                 readinessBadge
                 Spacer(minLength: 8)
-                if showsBackdropToggle {
-                    backdropSwitch
-                }
+                // How many people have Eagle open, under Settings, on Customize and Access alike.
+                EagleOnlineBadge()
             }
+            // A fixed height, so nothing moves between Access and Customize, nor when the count arrives.
+            .frame(height: 44)
         }
-    }
-
-    /// Switch that turns the Eagle backdrop on or off: a system-style switch in black and white
-    /// instead of green.
-    /// The backdrop opens in a circle from the switch (and closes back into it); a light tap on the
-    /// flip and a softer one as the backdrop settles.
-    private var backdropSwitch: some View {
-        GeometryReader { proxy in
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                let frame = proxy.frame(in: .global)
-                EagleBackdrop.toggleOrigin = CGPoint(x: frame.midX, y: frame.midY)
-                EagleBackdrop.toggleBounds = UIApplication.shared.connectedScenes
-                    .compactMap { ($0 as? UIWindowScene)?.windows.first(where: \.isKeyWindow) }
-                    .first?.bounds ?? .zero
-                withAnimation(.easeInOut(duration: EagleBackdrop.toggleDuration)) { backdropEnabled.toggle() }
-                DispatchQueue.main.asyncAfter(deadline: .now() + EagleBackdrop.toggleDuration * 0.9) {
-                    UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.5)
-                }
-            } label: {
-                EmptyView()
-            }
-            .buttonStyle(EagleBackdropSwitchStyle(isOn: backdropEnabled))
-            .accessibilityLabel(LaraL10n.text(en: "Eagle background", es: "Fondo Eagle"))
-            .accessibilityValue(backdropEnabled
-                ? LaraL10n.text(en: "On", es: "Activado")
-                : LaraL10n.text(en: "Off", es: "Desactivado"))
-        }
-        .frame(width: 51, height: 44)
     }
 
     private var languageBadge: some View {

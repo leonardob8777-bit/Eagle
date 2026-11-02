@@ -379,6 +379,7 @@ struct DockGalleryView: View {
     @AppStorage("eagle.dockGallery.positionX") private var positionX = 0.0
     @AppStorage("eagle.dockGallery.positionY") private var positionY = 0.0
     @AppStorage("eagle.dockGallery.favoriteIDs") private var favoriteIDsJSON = "[]"
+    @ObservedObject private var likes = EagleLikes.shared
     @AppStorage("eagle.dockGallery.lastViewedStaticID") private var lastViewedStaticID = ""
     @AppStorage("eagle.dockGallery.lastViewedLiveID") private var lastViewedLiveID = ""
     @State private var isApplying = false
@@ -505,6 +506,9 @@ struct DockGalleryView: View {
         .task {
             await remoteGallery.load()
             synchronizeRemoteSelection()
+        }
+        .task {
+            await EagleLikes.shared.refresh(.dock, favorites: favoriteIDs)
         }
         .onChange(of: remoteGallery.themes) { _ in
             synchronizeRemoteSelection()
@@ -766,23 +770,14 @@ struct DockGalleryView: View {
                         .font(.caption)
                         .foregroundStyle(theme.color)
                 }
-                Spacer(minLength: 6)
-                Button {
-                    toggleFavorite(theme)
-                } label: {
-                    Image(systemName: favoriteIDs.contains(theme.id) ? "heart.fill" : "heart")
-                        .font(.system(size: 16))
-                        .foregroundStyle(favoriteIDs.contains(theme.id) ? Color.pink : .primary)
-                        .eagleSymbolPop(favoriteIDs.contains(theme.id))
-                        .frame(width: 44, height: 44)
-                        .background(Color.primary.opacity(0.05), in: Circle())
+                if theme.id == likes.hottest(.dock, among: visibleRemoteThemes.map(\.id)) {
+                    EagleHotBadge()
                 }
-                .buttonStyle(EaglePressableStyle(kind: .swatch))
+                Spacer(minLength: 6)
+                EagleLikeButton(kind: .dock, id: theme.id, isLiked: favoriteIDs.contains(theme.id), onArtwork: false) {
+                    toggleFavorite(theme)
+                }
                 .disabled(isApplying || remoteGallery.downloadingID != nil)
-                .accessibilityLabel(favoriteIDs.contains(theme.id)
-                    ? LaraL10n.text(en: "Remove from favorites", es: "Quitar de favoritos")
-                    : LaraL10n.text(en: "Add to favorites", es: "Añadir a favoritos"))
-                .accessibilityValue(theme.localizedTitle)
             }
 
             HStack(spacing: 28) {
@@ -858,12 +853,13 @@ struct DockGalleryView: View {
 
     private var visibleRemoteThemes: [RemoteDockGalleryTheme] {
         let favorites = favoriteIDs
-        return EagleDockGalleryCollection.visible(
+        // Most liked first; themes nobody liked yet keep this visit's shuffled order.
+        return likes.sortedByLikes(EagleDockGalleryCollection.visible(
             themes: remoteGallery.themes,
             orderedIDs: shuffledRemoteIDs,
             filter: mediaFilter,
             favorites: favorites
-        )
+        ), .dock, id: \.id)
     }
 
     private var favoriteIDs: Set<String> {
@@ -871,6 +867,11 @@ struct DockGalleryView: View {
     }
 
     private func toggleFavorite(_ theme: RemoteDockGalleryTheme) {
+        let wasLiked = favoriteIDs.contains(theme.id)
+        defer {
+            let liked = favoriteIDs.contains(theme.id)
+            if liked != wasLiked { EagleLikes.shared.setLiked(.dock, theme.id, liked: liked) }
+        }
         EagleDockGalleryInteractions.toggleFavorite(
             theme,
             readFavorites: { favoriteIDs },
@@ -1141,7 +1142,7 @@ struct DockGalleryView: View {
                 return EagleDockGalleryOutcome(succeeded: result.succeeded, message: result.message)
             },
             successFeedback: { UINotificationFeedbackGenerator().notificationOccurred(.success) },
-            notify: { EagleNotifications.shared.result($0, title: "Dock Gallery", message: $1) }
+            notify: { EagleNotifications.shared.result($0, title: LaraL10n.text(en: "Dock Gallery", es: "Galería Dock"), message: $1) }
         )
     }
 
@@ -1157,7 +1158,7 @@ struct DockGalleryView: View {
                 await EagleDockGalleryCore(port: CurrentDockGalleryPort()).applyRemote($0)
             },
             successFeedback: { UINotificationFeedbackGenerator().notificationOccurred(.success) },
-            notify: { EagleNotifications.shared.result($0, title: "Dock Gallery", message: $1) },
+            notify: { EagleNotifications.shared.result($0, title: LaraL10n.text(en: "Dock Gallery", es: "Galería Dock"), message: $1) },
             preparationFailureMessage: {
                 LaraL10n.text(
                     en: "The original theme package could not be downloaded or verified. Nothing changed.",
@@ -1173,7 +1174,7 @@ struct DockGalleryView: View {
             setApplying: { isApplying = $0 },
             restore: { await EagleDockGalleryCore(port: CurrentDockGalleryPort()).restore() },
             successFeedback: { UINotificationFeedbackGenerator().notificationOccurred(.success) },
-            notify: { EagleNotifications.shared.result($0, title: "Dock Gallery", message: $1) }
+            notify: { EagleNotifications.shared.result($0, title: LaraL10n.text(en: "Dock Gallery", es: "Galería Dock"), message: $1) }
         )
     }
 

@@ -12,8 +12,9 @@ final class EagleRemoteMediaLoader: ObservableObject {
 
     private static let cache: NSCache<NSURL, NSData> = {
         let cache = NSCache<NSURL, NSData>()
-        cache.countLimit = 24
-        cache.totalCostLimit = 24 * 1024 * 1024
+        // Room for every thumbnail of a gallery, so scrolling back does not download them again.
+        cache.countLimit = 80
+        cache.totalCostLimit = 48 * 1024 * 1024
         return cache
     }()
 
@@ -52,6 +53,18 @@ final class EagleRemoteMediaLoader: ObservableObject {
             do {
                 try Task.checkCancellation()
                 guard generation == requestGeneration else { return }
+                if url.isFileURL {
+                    let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                    guard !data.isEmpty, data.count <= 40 * 1024 * 1024,
+                          let source = CGImageSourceCreateWithData(data as CFData, nil),
+                          CGImageSourceGetCount(source) > 0 else {
+                        throw URLError(.cannotDecodeContentData)
+                    }
+                    Self.cache.setObject(data as NSData, forKey: url as NSURL, cost: data.count)
+                    guard generation == requestGeneration else { return }
+                    state = .loaded(data, Self.mimeType(for: url, response: nil), requestGeneration)
+                    return
+                }
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 35
                 request.cachePolicy = forceRefresh || attempt > 0

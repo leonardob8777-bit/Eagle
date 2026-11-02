@@ -90,13 +90,80 @@ struct SettingsView: View {
         EagleFeaturePolicy.allows(.advancedSystemTools, channel: channel)
     }
 
+    @AppStorage(LaraLanguage.storageKey) private var language = LaraLanguage.english
+    @State private var showingTelegram = false
+    @AppStorage(EagleBackdrop.storageKey) private var backdropEnabled = true
+
+    private var discordFooter: Text {
+        Text(LocalizedStringKey(LaraL10n.text(
+            en: "Deleting and fetching the kernelcache again may fix some issues. Try this before asking for help on [Discord](https://discord.gg/gw8PcRF3Jr).",
+            es: "Borrar y volver a obtener el kernelcache puede resolver algunos problemas. Pruébalo antes de pedir ayuda en [Discord](https://discord.gg/gw8PcRF3Jr)."
+        )))
+    }
+
+    /// Eagle and its creator in one card: the app with its version, then the link to Leonardo's GitHub.
+    private var identityCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                AppIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(AppInfo.appName)
+                        .font(.title3.weight(.semibold))
+                    Text(LaraL10n.text(
+                        en: "Version \(AppInfo.appVersion) (\(AppInfo.appBuild))",
+                        es: "Versión \(AppInfo.appVersion) (\(AppInfo.appBuild))"
+                    ))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+
+            Divider().padding(.leading, 16)
+
+            Link(destination: URL(string: "https://github.com/leonardob8777-bit")!) {
+                HStack(spacing: 12) {
+                    Image("LeonardoAvatar")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFill()
+                        .frame(width: 34, height: 34)
+                        .clipShape(Circle())
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(LaraL10n.text(en: "Made by Leonardo", es: "Hecho por Leonardo"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("@leonardob8777-bit")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "arrow.up.forward")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableCardButtonStyle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(LaraL10n.text(
+                en: "Leonardo, creator of Eagle. Opens GitHub profile.",
+                es: "Leonardo, creador de Eagle. Abre el perfil de GitHub."
+            ))
+            .accessibilityAddTraits(.isLink)
+        }
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
     private var laboratoryIntro: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "testtube.2")
-                    .font(.title2.weight(.semibold))
-                    .frame(width: 42, height: 42)
-                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                SettingsIcon(systemImage: "testtube.2", size: 42)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LaraL10n.text(en: "System laboratory", es: "Laboratorio del sistema"))
                         .font(.headline)
@@ -106,402 +173,52 @@ struct SettingsView: View {
                 }
             }
             HStack(spacing: 8) {
-                laboratoryStatus(
-                    LaraL10n.text(en: "Access", es: "Acceso"),
-                    ready: mgr.dsready
-                )
-                laboratoryStatus(
-                    LaraL10n.text(en: "Offsets", es: "Offsets"),
-                    ready: mgr.hasOffsets
-                )
+                laboratoryStatus(LaraL10n.text(en: "Access", es: "Acceso"), ready: mgr.dsready)
+                laboratoryStatus("Offsets", ready: mgr.hasOffsets)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 20))
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func laboratoryStatus(_ title: String, ready: Bool) -> some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(ready ? Color.primary : Color.secondary.opacity(0.4))
+                .fill(ready ? Color.green : Color.secondary.opacity(0.4))
                 .frame(width: 7, height: 7)
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(ready ? Color.primary : Color.secondary)
+            Text(ready
+                 ? LaraL10n.text(en: "Ready", es: "Listo")
+                 : LaraL10n.text(en: "Not ready", es: "Sin preparar"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 10)
         .frame(height: 30)
-        .background(Color.primary.opacity(0.05), in: Capsule())
-    }
-
-    private var developerCard: some View {
-        Link(destination: URL(string: "https://github.com/leonardob8777-bit")!) {
-            HStack(spacing: 14) {
-                Image("LeonardoAvatar")
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .frame(width: 56, height: 56)
-                    .clipShape(Circle())
-                    .overlay {
-                        Circle().strokeBorder(.primary.opacity(0.08), lineWidth: 1)
-                    }
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Leonardo")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(LaraL10n.text(en: "Creator of Eagle", es: "Creador de Eagle"))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 5) {
-                        Image(systemName: "chevron.left.forwardslash.chevron.right")
-                            .font(.caption2.weight(.semibold))
-                        Text("@leonardob8777-bit")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 1)
-                }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: "arrow.up.forward")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-        .buttonStyle(PressableCardButtonStyle())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(LaraL10n.text(
-            en: "Leonardo, creator of Eagle. Opens GitHub profile.",
-            es: "Leonardo, creador de Eagle. Abre el perfil de GitHub."
-        ))
-        .accessibilityAddTraits(.isLink)
+        .background(Color.primary.opacity(0.06), in: Capsule())
     }
 
     var body: some View {
         NavigationStack {
             List {
                 if destination == .preferences {
-                Section {
-                    developerCard
-                        .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 14, trailing: 20))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
-
-                Section {
-                    Picker(
-                        LaraL10n.text(en: "Appearance", es: "Apariencia"),
-                        selection: $appearanceModeRaw
-                    ) {
-                        ForEach(EagleAppearanceMode.allCases) { mode in
-                            Text(mode.title).tag(mode.rawValue)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .accessibilityLabel(LaraL10n.text(en: "Appearance", es: "Apariencia"))
-                } header: {
-                    HeaderLabel(
-                        text: LaraL10n.text(en: "Appearance", es: "Apariencia"),
-                        icon: "circle.lefthalf.filled"
-                    )
-                } footer: {
-                    Text(LaraL10n.text(
-                        en: "Dark is the recommended Eagle experience. Light and System remain available.",
-                        es: "Oscuro es la experiencia recomendada de Eagle. Claro y Sistema siguen disponibles."
-                    ))
-                }
-
-                Section(header: HeaderLabel(
-                    text: LaraL10n.text(en: "About", es: "Acerca de"),
-                    icon: "info.circle"
-                )) {
-                    AppInfoCell()
-                    NavigationLink(
-                        LaraL10n.text(en: "Credits", es: "Créditos"),
-                        destination: CreditsView()
-                    )
-                }
-
-                Section {
-                    NavigationLink(destination: EagleCompatibilityCenterView()) {
-                        Label(
-                            LaraL10n.text(en: "Compatibility", es: "Compatibilidad"),
-                            systemImage: "checkmark.shield.fill"
-                        )
-                    }
-                    LabeledContent(
-                        LaraL10n.text(en: "Feature channel", es: "Canal de funciones"),
-                        value: channel.title
-                    )
-                } header: {
-                    HeaderLabel(
-                        text: LaraL10n.text(en: "Availability", es: "Disponibilidad"),
-                        icon: "slider.horizontal.3"
-                    )
-                } footer: {
-                    if !advancedToolsAllowed {
-                        Text(LaraL10n.text(
-                            en: "Kernelcache and RemoteCall controls require the Laboratory channel.",
-                            es: "Los controles de Kernelcache y RemoteCall requieren el canal Laboratorio."
-                        ))
-                    }
-                }
+                    preferencesSections
                 } else {
-                    Section {
-                        laboratoryIntro
-                            .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 12, trailing: 20))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                    }
-                    if !advancedToolsAllowed {
-                        Section {
-                            Text(LaraL10n.text(
-                                en: "Choose the Laboratory channel on Customize to use these tools.",
-                                es: "Elige el canal Laboratorio en Personalizar para usar estas herramientas."
-                            ))
-                            .foregroundStyle(.secondary)
-                        }
-                    }
+                    laboratorySections
                 }
-                
-                if destination == .laboratory && advancedToolsAllowed {
-                    Section(header: HeaderLabel(text: "Exploit", icon: "ant")) {
-                    Picker(
-                        LaraL10n.text(en: "Access method", es: "Método de acceso"),
-                        selection: $selectedMethod
-                    ) {
-                        ForEach(method.allCases, id: \.self) { method in
-                            Text(method.rawValue).tag(method)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .accessibilityLabel(LaraL10n.text(
-                        en: "Access method",
-                        es: "Método de acceso"
-                    ))
-                    .onChange(of: selectedMethod) { newValue in
-                        EaglePreferenceMigration.persistAccessMethod(newValue.rawValue)
-                    }
-                    
-                    NavigationLink("Modify Offsets", destination: OffsetManagementView())
-                    }
-                }
-                
-                // kernelcache
-                if destination == .laboratory && advancedToolsAllowed {
-                    Section {
-                    if !mgr.hasOffsets {
-                        // this does not need to be here any longer, but i'll keep it here anyways.
-                        Button {
-                            guard !dlingkcache else { return }
-                            dlingkcache = true
-
-                            DispatchQueue.global(qos: .userInitiated).async {
-                                let fetched = fetchkcache()
-
-                                if fetched {
-                                    let dlkc = dlkcache()
-                                    DispatchQueue.main.async {
-                                        mgr.hasOffsets = dlkc
-                                        dlingkcache = false
-                                    }
-                                    return
-                                }
-
-                                DispatchQueue.main.async {
-                                    mgr.hasOffsets = false
-                                    dlingkcache = false
-                                }
-                            }
-                        } label: {
-                            if dlingkcache {
-                                HStack {
-                                    Text("Fetching Kernelcache...")
-                                    Spacer()
-                                    ProgressView()
-                                }
-                            } else {
-                                Text("Fetch Kernelcache")
-                            }
-                        }
-                        .disabled(dlingkcache || !mgr.dsready)
-                               
-                        LabeledContent(content: {
-                            Button(action: {
-                                showkcachetips.toggle()
-                            }) {
-                                Image(systemName: "info.circle")
-                            }
-                        }) {
-                            Button("Import Kernelcache", action: {
-                                guard !importingkcache else { return }
-                                showkcacheimport = true
-                            })
-                            .disabled(dlingkcache || importingkcache)
-                        }
-                    } else {
-                        Button("Remove Kernelcache", action: {
-                            Alertinator.shared.alert(title: "Clear Kernelcache Data?", body: "This will delete all kernelcache data and remove saved offsets. You will have to refetch the data to use Eagle again.", actionLabel: "Confirm", action: {
-                                clearKcacheData()
-                            })
-                        })
-                        .foregroundColor(.red)
-                    }
-                } header: {
-                    HeaderLabel(text: "Kernelcache", icon: "cpu")
-                } footer: {
-                    if (!mgr.hasOffsets && (!mgr.dsready || (!mgr.vfsready && !mgr.sbxready))) {
-                        Text("NOTE: You will have to click \"Run Exploit\" before you can fetch kernelcache.\n\nDeleting and refetching kernelcache may fix some issues. Try doing this before opening a GitHub issue or asking for support in our [Discord](https://discord.gg/gw8PcRF3Jr) server.")
-                    } else {
-                        Text("Deleting and refetching kernelcache may fix some issues. Try doing this before opening a GitHub issue or asking for support in our [Discord](https://discord.gg/gw8PcRF3Jr) server.")
-                    }
-                }
-                }
-                
-                // tips
-                if destination == .laboratory && advancedToolsAllowed && showkcachetips {
-                    Section {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("How to obtain a kernelcache (macOS)")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundColor(.primary)
-                                .padding(.bottom, 2)
-
-                            Text("1. Download the IPSW tool for your device.")
-                            Link("https://github.com/blacktop/ipsw/releases",
-                                 destination: URL(string: "https://github.com/blacktop/ipsw/releases")!)
-                            
-                            Text("2. Extract the archive.")
-                            Text("3. Open Terminal.")
-                            Text("4. Navigate to the extracted folder:")
-                            Text("cd /path/to/ipsw_3.1.671_something_something/")
-                                .font(.system(.caption2, design: .monospaced))
-                                .textSelection(.enabled)
-                                .foregroundColor(.primary)
-                            
-                            Text("5. Extract the kernel:")
-                            Text("./ipsw extract --kernel [drag your ipsw here]")
-                                .font(.system(.caption2, design: .monospaced))
-                                .textSelection(.enabled)
-                                .foregroundColor(.primary)
-                            
-                            Text("6. Get the kernelcache file.")
-                            Text("7. Transfer the kernelcache to your iCloud or iPhone.")
-                            Text("8. Tap the button above and select the kernelcache, for example kernelcache.release.iPhone14,3.")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 4)
-                    }
-                }
-                
-                if destination == .preferences {
-                Section(header: HeaderLabel(text: LaraL10n.text(en: "App", es: "App"), icon: "gearshape"), footer: Text(LaraL10n.text(
-                    en: "If keep alive is enabled, the app will continue running even if it is minimized.",
-                    es: "Si Mantener activa está encendido, la app sigue funcionando aunque la minimices."
-                ))) {
-                    Toggle(LaraL10n.text(en: "Keep Alive", es: "Mantener activa"), isOn: $keepAlive)
-                        .onChange(of: keepAlive) { _ in
-                            if keepAlive {
-                                if !kaenabled { toggleka() }
-                            } else {
-                                if kaenabled { toggleka() }
-                            }
-                        }
-                    Toggle("Disable Log Dividers", isOn: $loggerNoBS)
-                        .onChange(of: loggerNoBS) { disabled in
-                            EaglePreferenceMigration.persistDisableLogDividers(disabled)
-                        }
-                }
-                
-                if advancedToolsAllowed {
-                    Section(header: HeaderLabel(text: "File Manager", icon: "folder"), footer: Text("Display Mode lets you change the way app folders get displayed in the file manager.")) {
-                    Picker("Display Mode", selection: $selectedFMAppsDisplayMode) {
-                        ForEach(fmAppsDisplayMode.allCases, id: \.self) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    Toggle("Recursive Search in File Manager", isOn: $fmRecursiveSearch)
-                    Toggle("Show File Manager in Tabs", isOn: $showFMInTabs)
-                    }
-                }
-                }
-                
-                #if !DISABLE_REMOTECALL
-                if destination == .laboratory && advancedToolsAllowed {
-                    Section(header: HeaderLabel(text: "RemoteCall", icon: "syringe")) {
-                    Toggle("Stash KRW primitives", isOn: $stashKRW)
-                        .onChange(of: stashKRW) { enabled in
-                            if enabled && isIOS16() {
-                                Alertinator.shared.alert(
-                                    title: "iOS 16 Warning",
-                                    body: "Saving KRW on iOS 16 is currently unstable. If it fails, manually stash KRW a few more times."
-                                )
-                            }
-                        }
-                    if isIOS16() {
-                        Toggle("Keep SpringBoard RemoteCall alive in background", isOn: $keepSpringBoardRemoteCallAliveIOS16)
-                        Text("Warning: If Eagle exits while RemoteCall is active, SpringBoard may respring.")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundColor(.red)
-
-                        Button {
-                            guard !stashingKRWNow else { return }
-                            stashingKRWNow = true
-                            mgr.stashKRWToLaunchd { success in
-                                stashingKRWNow = false
-                                if success {
-                                    Alertinator.shared.alert(
-                                        title: "KRW Stashed",
-                                        body: "KRW primitives were successfully stashed to launchd."
-                                    )
-                                } else {
-                                    let error = mgr.rcLastError ?? "Please try manually stashing KRW a few more times."
-                                    Alertinator.shared.alert(
-                                        title: "Failed to Stash KRW",
-                                        body: error
-                                    )
-                                }
-                            }
-                        } label: {
-                            if stashingKRWNow {
-                                HStack {
-                                    Text("Stashing KRW to launchd...")
-                                    Spacer()
-                                    ProgressView()
-                                }
-                            } else {
-                                Text("Stash KRW to launchd now")
-                            }
-                        }
-                        .disabled(!mgr.dsready || mgr.rcrunning || stashingKRWNow)
-                    }
-                    Toggle("Allow >10 dock icons", isOn: $rcDockUnlimited)
-                    }
-                }
-                #endif
             }
+            // Settings and Laboratory Tools are always pure black, whatever the app's appearance.
+            .scrollContentBackground(.hidden)
+            .background(Color.black.ignoresSafeArea())
+            .toolbarBackground(Color.black, for: .navigationBar)
             .navigationTitle(destination == .laboratory
                 ? LaraL10n.text(en: "Laboratory Tools", es: "Herramientas de Laboratorio")
                 : LaraL10n.text(en: "Settings", es: "Ajustes"))
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
@@ -511,6 +228,10 @@ struct SettingsView: View {
                             .foregroundStyle(.primary)
                     }
                 }
+            }
+            .sheet(isPresented: $showingTelegram) {
+                TelegramSafariView(url: EagleLinks.telegram)
+                    .ignoresSafeArea()
             }
             .fileImporter(isPresented: $showkcacheimport, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
                 switch result {
@@ -549,8 +270,373 @@ struct SettingsView: View {
                 }
             }
         }
+        // Applies to this sheet only, not to the rest of Eagle.
+        .preferredColorScheme(.dark)
     }
-    
+
+    // MARK: - Settings
+
+    @ViewBuilder
+    private var preferencesSections: some View {
+        Section {
+            identityCard
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowBackground(Color.clear)
+        }
+
+        Section {
+            Picker(selection: $language) {
+                ForEach(LaraLanguage.allCases) { option in
+                    Text(option.displayName).tag(option)
+                }
+            } label: {
+                SettingsRowLabel(LaraL10n.text(en: "Language", es: "Idioma"), systemImage: "globe")
+            }
+            .pickerStyle(.menu)
+
+            Picker(selection: $appearanceModeRaw) {
+                ForEach(EagleAppearanceMode.allCases) { mode in
+                    Text(mode.title).tag(mode.rawValue)
+                }
+            } label: {
+                SettingsRowLabel(LaraL10n.text(en: "Appearance", es: "Apariencia"), systemImage: "circle.lefthalf.filled")
+            }
+            .pickerStyle(.menu)
+
+            // The Eagle background, moved here from Access. From a sheet there is no switch on the
+            // screen to open the circle from, so the background simply fades in or out.
+            Toggle(isOn: Binding(
+                get: { backdropEnabled },
+                set: { on in
+                    EagleBackdrop.toggleOrigin = nil
+                    withAnimation(.easeInOut(duration: EagleBackdrop.toggleDuration)) { backdropEnabled = on }
+                }
+            )) {
+                SettingsRowLabel(LaraL10n.text(en: "Eagle background", es: "Fondo Eagle"), systemImage: "photo.fill.on.rectangle.fill")
+            }
+
+            Toggle(isOn: $keepAlive) {
+                SettingsRowLabel(LaraL10n.text(en: "Keep Alive", es: "Mantener activa"), systemImage: "bolt.fill")
+            }
+            .onChange(of: keepAlive) { _ in
+                if keepAlive {
+                    if !kaenabled { toggleka() }
+                } else {
+                    if kaenabled { toggleka() }
+                }
+            }
+        } header: {
+            Text(LaraL10n.text(en: "General", es: "General"))
+        } footer: {
+            Text(LaraL10n.text(
+                en: "Keep Alive lets Eagle keep working while it is in the background.",
+                es: "Mantener activa permite que Eagle siga funcionando en segundo plano."
+            ))
+        }
+
+        Section {
+            NavigationLink(destination: EagleCompatibilityCenterView()) {
+                SettingsRowLabel(LaraL10n.text(en: "Compatibility", es: "Compatibilidad"), systemImage: "checkmark.shield.fill")
+            }
+            LabeledContent {
+                Text(channel.title)
+            } label: {
+                SettingsRowLabel(LaraL10n.text(en: "Feature channel", es: "Canal de funciones"), systemImage: "slider.horizontal.3")
+            }
+            NavigationLink(destination: CreditsView()) {
+                SettingsRowLabel(LaraL10n.text(en: "Credits", es: "Créditos"), systemImage: "heart.fill")
+            }
+        } header: {
+            Text("Eagle")
+        } footer: {
+            if !advancedToolsAllowed {
+                Text(LaraL10n.text(
+                    en: "Kernelcache and RemoteCall controls require the Laboratory channel.",
+                    es: "Los controles de Kernelcache y RemoteCall requieren el canal Laboratorio."
+                ))
+            }
+        }
+
+        Section {
+            Toggle(isOn: $loggerNoBS) {
+                SettingsRowLabel(LaraL10n.text(en: "Hide log dividers", es: "Ocultar separadores del registro"), systemImage: "text.alignleft")
+            }
+            .onChange(of: loggerNoBS) { disabled in
+                EaglePreferenceMigration.persistDisableLogDividers(disabled)
+            }
+
+            if advancedToolsAllowed {
+                Picker(selection: $selectedFMAppsDisplayMode) {
+                    ForEach(fmAppsDisplayMode.allCases, id: \.self) { mode in
+                        Text(fileManagerModeTitle(mode)).tag(mode)
+                    }
+                } label: {
+                    SettingsRowLabel(LaraL10n.text(en: "App folders shown as", es: "Carpetas de apps como"), systemImage: "folder.fill")
+                }
+                .pickerStyle(.menu)
+                Toggle(isOn: $fmRecursiveSearch) {
+                    SettingsRowLabel(LaraL10n.text(en: "Search inside folders", es: "Buscar dentro de carpetas"), systemImage: "magnifyingglass")
+                }
+                Toggle(isOn: $showFMInTabs) {
+                    SettingsRowLabel(LaraL10n.text(en: "File Manager in tabs", es: "Archivos en las pestañas"), systemImage: "rectangle.split.3x1.fill")
+                }
+            }
+        } header: {
+            Text(LaraL10n.text(en: "Advanced", es: "Avanzado"))
+        }
+
+        // The same Telegram button as the welcome, closing the list.
+        Section {
+            EagleTelegramButton { showingTelegram = true }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .listRowBackground(Color.clear)
+        }
+    }
+
+    private func fileManagerModeTitle(_ mode: fmAppsDisplayMode) -> String {
+        switch mode {
+        case .UUID: return "UUID"
+        case .bundleID: return "Bundle ID"
+        case .appName: return LaraL10n.text(en: "App name", es: "Nombre de la app")
+        }
+    }
+
+    // MARK: - Laboratory
+
+    @ViewBuilder
+    private var laboratorySections: some View {
+        Section {
+            laboratoryIntro
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowBackground(Color.clear)
+        }
+
+        if !advancedToolsAllowed {
+            Section {
+                Label(
+                    LaraL10n.text(
+                        en: "Choose the Laboratory channel on Customize to use these tools.",
+                        es: "Elige el canal Laboratorio en Personalizar para usar estas herramientas."
+                    ),
+                    systemImage: "lock.fill"
+                )
+                .foregroundStyle(.secondary)
+            }
+        } else {
+            Section {
+                Picker(
+                    LaraL10n.text(en: "Access method", es: "Método de acceso"),
+                    selection: $selectedMethod
+                ) {
+                    ForEach(method.allCases, id: \.self) { method in
+                        Text(method.rawValue).tag(method)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel(LaraL10n.text(en: "Access method", es: "Método de acceso"))
+                .onChange(of: selectedMethod) { newValue in
+                    EaglePreferenceMigration.persistAccessMethod(newValue.rawValue)
+                }
+
+                NavigationLink(destination: OffsetManagementView()) {
+                    SettingsRowLabel(LaraL10n.text(en: "Modify offsets", es: "Modificar offsets"), systemImage: "list.number")
+                }
+            } header: {
+                Text(LaraL10n.text(en: "Access", es: "Acceso"))
+            }
+
+            Section {
+                if !mgr.hasOffsets {
+                    Button {
+                        guard !dlingkcache else { return }
+                        dlingkcache = true
+
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            let fetched = fetchkcache()
+
+                            if fetched {
+                                let dlkc = dlkcache()
+                                DispatchQueue.main.async {
+                                    mgr.hasOffsets = dlkc
+                                    dlingkcache = false
+                                }
+                                return
+                            }
+
+                            DispatchQueue.main.async {
+                                mgr.hasOffsets = false
+                                dlingkcache = false
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            SettingsRowLabel(
+                                dlingkcache
+                                    ? LaraL10n.text(en: "Fetching kernelcache…", es: "Obteniendo kernelcache…")
+                                    : LaraL10n.text(en: "Fetch kernelcache", es: "Obtener kernelcache"),
+                                systemImage: "arrow.down.circle.fill"
+                            )
+                            Spacer()
+                            if dlingkcache { ProgressView() }
+                        }
+                    }
+                    .disabled(dlingkcache || !mgr.dsready)
+
+                    Button {
+                        guard !importingkcache else { return }
+                        showkcacheimport = true
+                    } label: {
+                        HStack {
+                            SettingsRowLabel(
+                                importingkcache
+                                    ? LaraL10n.text(en: "Importing kernelcache…", es: "Importando kernelcache…")
+                                    : LaraL10n.text(en: "Import kernelcache", es: "Importar kernelcache"),
+                                systemImage: "square.and.arrow.down.fill"
+                            )
+                            Spacer()
+                            if importingkcache { ProgressView() }
+                        }
+                    }
+                    .disabled(dlingkcache || importingkcache)
+
+                    DisclosureGroup(isExpanded: $showkcachetips) {
+                        kernelcacheSteps
+                    } label: {
+                        SettingsRowLabel(LaraL10n.text(en: "How to get a kernelcache", es: "Cómo obtener un kernelcache"), systemImage: "questionmark.circle.fill")
+                    }
+                } else {
+                    Button(role: .destructive) {
+                        Alertinator.shared.alert(
+                            title: LaraL10n.text(en: "Clear kernelcache data?", es: "¿Borrar los datos del kernelcache?"),
+                            body: LaraL10n.text(
+                                en: "This deletes all kernelcache data and saved offsets. You will need to fetch them again to use Eagle.",
+                                es: "Se borran todos los datos del kernelcache y los offsets guardados. Tendrás que obtenerlos de nuevo para usar Eagle."
+                            ),
+                            actionLabel: LaraL10n.text(en: "Delete", es: "Borrar"),
+                            action: { clearKcacheData() }
+                        )
+                    } label: {
+                        SettingsRowLabel(LaraL10n.text(en: "Remove kernelcache", es: "Quitar kernelcache"), systemImage: "trash.fill")
+                    }
+                }
+            } header: {
+                Text("Kernelcache")
+            } footer: {
+                if !mgr.hasOffsets && (!mgr.dsready || (!mgr.vfsready && !mgr.sbxready)) {
+                    Text(LaraL10n.text(
+                        en: "Prepare Eagle before fetching the kernelcache.",
+                        es: "Prepara Eagle antes de obtener el kernelcache."
+                    )) + Text("\n\n") + discordFooter
+                } else {
+                    discordFooter
+                }
+            }
+
+            #if !DISABLE_REMOTECALL
+            Section {
+                Toggle(isOn: $stashKRW) {
+                    SettingsRowLabel(LaraL10n.text(en: "Stash KRW primitives", es: "Guardar primitivas KRW"), systemImage: "archivebox.fill")
+                }
+                .onChange(of: stashKRW) { enabled in
+                    if enabled && isIOS16() {
+                        Alertinator.shared.alert(
+                            title: LaraL10n.text(en: "iOS 16 warning", es: "Aviso para iOS 16"),
+                            body: LaraL10n.text(
+                                en: "Saving KRW on iOS 16 is currently unstable. If it fails, stash KRW manually a few more times.",
+                                es: "Guardar KRW en iOS 16 todavía es inestable. Si falla, guárdalo manualmente unas cuantas veces más."
+                            )
+                        )
+                    }
+                }
+
+                if isIOS16() {
+                    Toggle(isOn: $keepSpringBoardRemoteCallAliveIOS16) {
+                        SettingsRowLabel(LaraL10n.text(en: "Keep SpringBoard RemoteCall alive", es: "Mantener RemoteCall de SpringBoard"), systemImage: "antenna.radiowaves.left.and.right")
+                    }
+
+                    Button {
+                        guard !stashingKRWNow else { return }
+                        stashingKRWNow = true
+                        mgr.stashKRWToLaunchd { success in
+                            stashingKRWNow = false
+                            if success {
+                                Alertinator.shared.alert(
+                                    title: LaraL10n.text(en: "KRW stashed", es: "KRW guardado"),
+                                    body: LaraL10n.text(
+                                        en: "KRW primitives were stashed to launchd.",
+                                        es: "Las primitivas KRW se guardaron en launchd."
+                                    )
+                                )
+                            } else {
+                                let error = mgr.rcLastError ?? LaraL10n.text(
+                                    en: "Try stashing KRW manually a few more times.",
+                                    es: "Intenta guardar KRW manualmente unas cuantas veces más."
+                                )
+                                Alertinator.shared.alert(
+                                    title: LaraL10n.text(en: "Could not stash KRW", es: "No se pudo guardar KRW"),
+                                    body: error
+                                )
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            SettingsRowLabel(
+                                stashingKRWNow
+                                    ? LaraL10n.text(en: "Stashing KRW to launchd…", es: "Guardando KRW en launchd…")
+                                    : LaraL10n.text(en: "Stash KRW to launchd now", es: "Guardar KRW en launchd ahora"),
+                                systemImage: "tray.and.arrow.down.fill"
+                            )
+                            Spacer()
+                            if stashingKRWNow { ProgressView() }
+                        }
+                    }
+                    .disabled(!mgr.dsready || mgr.rcrunning || stashingKRWNow)
+                }
+
+                Toggle(isOn: $rcDockUnlimited) {
+                    SettingsRowLabel(LaraL10n.text(en: "Allow more than 10 Dock icons", es: "Permitir más de 10 iconos en el Dock"), systemImage: "dock.rectangle")
+                }
+            } header: {
+                Text("RemoteCall")
+            } footer: {
+                if isIOS16() {
+                    Text(LaraL10n.text(
+                        en: "If Eagle closes while RemoteCall is active, SpringBoard may respring.",
+                        es: "Si Eagle se cierra con RemoteCall activo, SpringBoard puede hacer respring."
+                    ))
+                    .foregroundStyle(.orange)
+                }
+            }
+            #endif
+        }
+    }
+
+    private var kernelcacheSteps: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(LaraL10n.text(en: "On a Mac:", es: "En un Mac:"))
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+            Text(LaraL10n.text(en: "1. Download the IPSW tool.", es: "1. Descarga la herramienta IPSW."))
+            Link("github.com/blacktop/ipsw/releases",
+                 destination: URL(string: "https://github.com/blacktop/ipsw/releases")!)
+            Text(LaraL10n.text(en: "2. Extract it and open Terminal in that folder.", es: "2. Descomprímela y abre Terminal en esa carpeta."))
+            Text(LaraL10n.text(en: "3. Extract the kernel:", es: "3. Extrae el kernel:"))
+            Text("./ipsw extract --kernel [ipsw]")
+                .font(.system(.caption2, design: .monospaced))
+                .textSelection(.enabled)
+                .foregroundStyle(.primary)
+            Text(LaraL10n.text(
+                en: "4. Send the kernelcache file to your iPhone (for example via iCloud) and choose it with Import kernelcache.",
+                es: "4. Pasa el archivo kernelcache al iPhone (por ejemplo con iCloud) y elígelo con Importar kernelcache."
+            ))
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.vertical, 4)
+    }
+
     private func clearKcacheData() {
         let fm = FileManager.default
         
@@ -586,5 +672,39 @@ struct SettingsView: View {
         
         mgr.logmsg("Kernelcache data cleared")
         mgr.hasOffsets = false
+    }
+}
+
+/// An iOS Settings-style row: a small icon tile and the title.
+private struct SettingsRowLabel: View {
+    let title: String
+    let systemImage: String
+
+    init(_ title: String, systemImage: String) {
+        self.title = title
+        self.systemImage = systemImage
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            SettingsIcon(systemImage: systemImage)
+            Text(title)
+                .foregroundStyle(.primary)
+        }
+    }
+}
+
+/// Flat tile with the symbol in black or white, like Eagle's own mark.
+private struct SettingsIcon: View {
+    let systemImage: String
+    var size: CGFloat = 30
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: size * 0.47, weight: .semibold))
+            .foregroundStyle(.primary)
+            .frame(width: size, height: size)
+            .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: size * 0.27, style: .continuous))
+            .accessibilityHidden(true)
     }
 }

@@ -6,7 +6,7 @@ import UIKit
 /// (measured), so the welcome dissolves onto it without the background changing:
 /// - dark appearance: white at the top, black where the content is;
 /// - light appearance: black at the top, white where the content is.
-/// It can be switched off from Access (`storageKey`), which brings back the plain system background.
+/// It can be switched off from Settings (`storageKey`), which brings back the plain system background.
 /// iOS draws the time and the Wi-Fi in the appearance's text colour, which is the colour of the
 /// backdrop's top, so while a backdrop is on screen it asks for the inverse status bar (`EagleStatusBar`).
 struct EagleBackdrop: View {

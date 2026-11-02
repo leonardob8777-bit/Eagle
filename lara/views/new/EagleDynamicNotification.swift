@@ -37,22 +37,27 @@ struct EagleDynamicNotice: Identifiable {
     var lightCard = true
 
     var sourceSymbol: String {
+        // Titles come in English, Spanish or Chinese, so each source lists its words in all three.
         let source = title.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-        if source.contains("island") || source.contains("isla") { return "capsule" }
-        if source.contains("dock") { return "dock.rectangle" }
-        if source.contains("prepare") || source.contains("prepar") || source == "eagle" { return "lock.shield.fill" }
-        if source.contains("battery") || source.contains("bateria") { return "battery.100percent" }
-        if source.contains("font") || source.contains("fuente") { return "textformat" }
-        if source.contains("wallpaper") || source.contains("fondo") { return "photo.fill" }
-        if source.contains("icon") || source.contains("icono") { return "square.grid.2x2.fill" }
-        if source.contains("scene") || source.contains("escena") { return "square.stack.3d.up.fill" }
-        if source.contains("aura") { return "sparkles" }
+        func any(_ words: String...) -> Bool { words.contains { source.contains($0) } }
+        if any("island", "isla", "灵动岛") { return "capsule" }
+        if any("dock", "程序坞") { return "dock.rectangle" }
+        if any("prepare", "prepar", "准备") || source == "eagle" { return "lock.shield.fill" }
+        if any("passcode", "codigo", "密码") { return "circle.grid.3x3.fill" }
+        if any("battery", "bateria", "电池") { return "battery.100percent" }
+        if any("emoji", "表情") { return "face.smiling" }
+        if any("font", "fuente", "字体") { return "textformat" }
+        if any("wallpaper", "fondo", "壁纸") { return "photo.fill" }
+        if any("card", "tarjeta", "wallet", "卡") { return "creditcard.fill" }
+        if any("icon", "icono", "图标") { return "square.grid.2x2.fill" }
+        if any("scene", "escena", "composer", "场景") { return "square.stack.3d.up.fill" }
         return "sparkles"
     }
 }
 
 /// One visible notification and one cancellable expiry. No polling, network,
-/// background work or permanent animation. Purely visual: it never intercepts touches.
+/// background work or permanent animation. Only the card itself takes touches (a tap or a swipe up
+/// closes it); everywhere else, taps reach the app underneath.
 @MainActor
 final class EagleNotifications: ObservableObject {
     static let shared = EagleNotifications()
@@ -65,6 +70,8 @@ final class EagleNotifications: ObservableObject {
     private var presentation: Task<Void, Never>?
     private var pending: EagleDynamicNotice?
     private var observers: [NSObjectProtocol] = []
+    /// Where the card sits on screen while it is showing; the only area of the overlay that takes touches.
+    fileprivate var cardRect: CGRect = .zero
     /// Length of the exit choreography in EagleNoticeCard, plus a frame of margin.
     static let exitDuration: UInt64 = 780_000_000
 
@@ -144,6 +151,10 @@ final class EagleNotifications: ObservableObject {
         incoming.immediate = current != nil
         if window == nil {
             let overlay = EagleNoticeWindow(windowScene: scene)
+            overlay.touchArea = { [weak self] in
+                guard let self, self.visible else { return .zero }
+                return self.cardRect
+            }
             overlay.windowLevel = .normal + 1
             overlay.backgroundColor = .clear
             let controller = UIHostingController(rootView: EagleNoticeOverlay(center: self))
@@ -206,9 +217,15 @@ final class EagleNotifications: ObservableObject {
     }
 }
 
-/// The notice is purely visual: its window never takes a touch, so taps reach the app underneath.
+/// The notice's window takes only touches on the card; everywhere else, taps reach the app underneath.
 private final class EagleNoticeWindow: UIWindow {
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
+    var touchArea: () -> CGRect = { .zero }
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let area = touchArea()
+        guard !area.isEmpty, area.insetBy(dx: -6, dy: -10).contains(point) else { return nil }
+        return super.hitTest(point, with: event)
+    }
 }
 
 struct EagleNotificationInstaller: UIViewRepresentable {
@@ -271,6 +288,12 @@ private struct EagleNoticeCard: View {
         }
     }
 
+    private func close() {
+        guard visible else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        center.dismiss()
+    }
+
     private var resolvedLayout: EagleNotificationLayout {
         // Normal type uses the reference's exact 74-point card. Larger type
         // retains readable text rather than clipping accessibility settings.
@@ -330,11 +353,20 @@ private struct EagleNoticeCard: View {
             .frame(width: l.cardWidth, height: l.cardHeight)
             .background(light ? Color.white : Color.black, in: Capsule())
             .environment(\.colorScheme, light ? .light : .dark)
-            .allowsHitTesting(false)
+            // A tap or a swipe up sends the card back into the island early.
+            .contentShape(Capsule())
+            .onTapGesture { close() }
+            .simultaneousGesture(DragGesture(minimumDistance: 8).onEnded { value in
+                if value.translation.height < -12 || value.predictedEndTranslation.height < -40 { close() }
+            })
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(notice.title + ". " + notice.message)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(LaraL10n.text(en: "Closes the notification", es: "Cierra la notificación"))
         }
         .frame(width: l.width, height: l.canvasHeight, alignment: .topLeading)
+        .onAppear { center.cardRect = l.cardRect }
+        .onChange(of: l.cardRect) { center.cardRect = $0 }
         .task(id: visible) {
             if reduceMotion || (visible && notice.immediate) {
                 if visible { announceHaptic() }

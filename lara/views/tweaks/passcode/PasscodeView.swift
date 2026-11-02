@@ -247,6 +247,11 @@ struct PasscodeView: View {
     @State private var showFilePicker = false
     @State private var processing = false
     @State private var statusMessage: String = ""
+    @State private var loadedStyleName: String?
+    @State private var openedStyle: PasscodeGalleryTheme?
+    @ObservedObject private var styleGallery = PasscodeGalleryManager.shared
+    @ObservedObject private var likes = EagleLikes.shared
+    @AppStorage(EaglePasscodeFavorites.storageKey) private var favoriteStyleIDsJSON = "[]"
     
     @ObservedObject private var themeManager = IconThemeManager.shared
     @ObservedObject private var passcodeThemeManager = PasscodeThemeManager.shared
@@ -293,139 +298,8 @@ struct PasscodeView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.fill")
-                            .font(.caption2.weight(.bold))
-                        Text(LaraL10n.text(en: "Lock Screen", es: "Pantalla de bloqueo"))
-                            .font(.caption.weight(.semibold))
-                    }
-                    .foregroundStyle(.purple)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.purple.opacity(0.12), in: Capsule())
-
-                    Text(LaraL10n.text(
-                        en: "A more personal passcode",
-                        es: "Un código más personal"
-                    ))
-                        .font(.title2.bold())
-                    Text(LaraL10n.text(
-                        en: "Choose a complete style or change each digit individually. Eagle saves the originals before applying.",
-                        es: "Elige un estilo completo o cambia cada número por separado. Eagle guarda los originales antes de aplicar."
-                    ))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                // On its own opaque card, like the rest of the screen, so the title and description read
-                // over the light top of the backdrop as well as over the dark.
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                }
-
-                NavigationLink {
-                    PasscodeExploreView(mgr: mgr) { url in
-                        importPassthmFile(url: url)
-                    }
-                } label: {
-                    HStack(spacing: 14) {
-                        Image(systemName: "sparkles.rectangle.stack.fill")
-                            .font(.title2)
-                            .foregroundStyle(.purple)
-                            .frame(width: 46, height: 46)
-                            .background(Color.purple.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(LaraL10n.text(en: "Eagle passcode styles", es: "Estilos de código Eagle"))
-                                .font(.headline)
-                                .foregroundStyle(.primary)
-                            Text(LaraL10n.text(
-                                en: "Download and apply Eagle styles",
-                                es: "Descarga y aplica estilos Eagle"
-                            ))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(16)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(PasscodePressStyle())
-
-                Button { showFilePicker = true } label: {
-                    Label("Importar archivo .passthm", systemImage: "square.and.arrow.down")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(EagleSecondaryButtonStyle())
-
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Vista previa")
-                                .font(.headline)
-                            Text(selectedKeys.isEmpty
-                                ? LaraL10n.text(en: "Choose a style to begin", es: "Elige un estilo para comenzar")
-                                : LaraL10n.text(en: "Tap a digit to change it", es: "Toca un número para cambiarlo"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if !selectedKeys.isEmpty {
-                            Text("\(selectedKeys.count)/10")
-                                .font(.caption.monospacedDigit().weight(.semibold))
-                                .foregroundStyle(.white.opacity(0.9))
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
-                                .background(Color.white.opacity(0.12), in: Capsule())
-                        }
-                    }
-
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12)
-                        ],
-                        spacing: 12
-                    ) {
-                        ForEach(Array(passcodeKeyLayout.enumerated()), id: \.offset) { _, keyId in
-                            if let keyId, let key = passcodeKeyMap[keyId] {
-                                PasscodeKeyButton(
-                                    key: key,
-                                    imageData: selectedKeys[key.id],
-                                    onSelect: { showImagePicker = key.id }
-                                )
-                            } else {
-                                Color.clear
-                                    .aspectRatio(1, contentMode: .fit)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                }
-                .padding(18)
-                .background { PasscodePreviewBackdrop(reduceMotion: reduceMotion) }
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                )
-                .environment(\.colorScheme, .dark)
+            VStack(alignment: .leading, spacing: 24) {
+                lockScreenPreview
 
                 if passcodeThemeManager.isApplying {
                     VStack(alignment: .leading, spacing: 8) {
@@ -439,28 +313,24 @@ struct PasscodeView: View {
                         }
                         ProgressView(value: passcodeThemeManager.progress, total: 1.0)
                     }
-                    .padding(16)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
-                    )
+                    .eagleHeaderCard()
                 }
 
                 if !statusMessage.isEmpty {
                     PasscodeStatusBanner(message: statusMessage)
                 }
 
+                stylesCarousel
             }
             .padding(.horizontal, 18)
-            .padding(.vertical, 16)
+            .padding(.vertical, 12)
             .padding(.bottom, 24)
         }
-        // Apply (and the restore menu) stay fixed at the bottom; Prepare takes their place until ready.
+        // Apply stays fixed at the bottom once the iPhone is ready. Before that, Prepare is offered
+        // inside each style; here it shows only when the user changed keys by hand.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            EagleApplyBar(ready: mgr.sbxready) {
-                HStack(spacing: 12) {
+            if mgr.sbxready || !selectedKeys.isEmpty {
+                EagleApplyBar(ready: mgr.sbxready) {
                     Button {
                         applyTheme()
                     } label: {
@@ -474,45 +344,72 @@ struct PasscodeView: View {
                         passcodeThemeManager.isApplying ||
                         !mgr.sbxready
                     )
-
-                    Menu {
-                        Button(role: .destructive) {
-                            selectedKeys.removeAll()
-                        } label: {
-                            Label(
-                                LaraL10n.text(en: "Clear selection", es: "Limpiar selección"),
-                                systemImage: "xmark.circle"
-                            )
-                        }
-
-                        Button(role: .destructive) {
-                            restoreTheme()
-                        } label: {
-                            Label(
-                                LaraL10n.text(
-                                    en: "Restore original digits",
-                                    es: "Restaurar números originales"
-                                ),
-                                systemImage: "arrow.uturn.backward"
-                            )
-                        }
-                        .disabled(processing || passcodeThemeManager.isApplying || !mgr.sbxready)
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.body.weight(.semibold))
-                            .frame(width: 28, height: 28)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
                 }
             }
         }
         .eagleScreenBackdrop()
-        .navigationTitle(LaraL10n.text(en: "Passcode Style", es: "Estilo del código"))
+        .navigationTitle(LaraL10n.text(en: "Passcode", es: "Código"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button {
+                        showFilePicker = true
+                    } label: {
+                        Label(
+                            LaraL10n.text(en: "Import .passthm file", es: "Importar archivo .passthm"),
+                            systemImage: "square.and.arrow.down"
+                        )
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        selectedKeys.removeAll()
+                        loadedStyleName = nil
+                    } label: {
+                        Label(
+                            LaraL10n.text(en: "Clear selection", es: "Limpiar selección"),
+                            systemImage: "xmark.circle"
+                        )
+                    }
+                    .disabled(selectedKeys.isEmpty)
+
+                    Button(role: .destructive) {
+                        restoreTheme()
+                    } label: {
+                        Label(
+                            LaraL10n.text(
+                                en: "Restore original digits",
+                                es: "Restaurar números originales"
+                            ),
+                            systemImage: "arrow.uturn.backward"
+                        )
+                    }
+                    .disabled(processing || passcodeThemeManager.isApplying || !mgr.sbxready)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel(LaraL10n.text(en: "More options", es: "Más opciones"))
+            }
+        }
         .sheet(item: $showImagePicker) { keyId in
             ImagePicker(imageData: $selectedKeys[keyId])
+        }
+        // Results arrive as an Eagle notification, as on every other screen. Progress ("…") stays
+        // on the page, and so do errors with details, which do not fit in a notification.
+        .onChange(of: statusMessage) { message in
+            guard !message.isEmpty, !message.hasSuffix("…") else { return }
+            let failed = message.hasPrefix("Error")
+            let firstLine = message.components(separatedBy: "\n").first ?? message
+            let short = failed ? String(firstLine.dropFirst("Error:".count)).trimmingCharacters(in: .whitespaces) : firstLine
+            EagleNotifications.shared.result(!failed, title: LaraL10n.text(en: "Passcode", es: "Código"), message: short)
+            if !message.contains("\n") { statusMessage = "" }
+        }
+        .sheet(item: $openedStyle) { theme in
+            PasscodeStyleSheet(theme: theme, gallery: styleGallery) {
+                Task { await useStyle(theme) }
+            }
         }
         .fileImporter(
             isPresented: $showFilePicker,
@@ -526,8 +423,178 @@ struct PasscodeView: View {
                 importPassthmFile(url: url)
             }
         }
+        .task {
+            if styleGallery.themes.isEmpty {
+                await styleGallery.loadThemes()
+            }
+        }
+        .task {
+            await EagleLikes.shared.refresh(.passcode, favorites: EaglePasscodeFavorites.decode(favoriteStyleIDsJSON))
+        }
     }
-    
+
+    /// The keypad as the lock screen shows it, on a complete iPhone: the loaded style's digits on
+    /// Eagle's dark backdrop. Each digit can still be replaced on its own by tapping it.
+    private var lockScreenPreview: some View {
+        VStack(spacing: 14) {
+            EagleDeviceFrame {
+                GeometryReader { proxy in
+                    let width = proxy.size.width
+                    let key = width * 0.21
+                    ZStack {
+                        PasscodePreviewBackdrop(reduceMotion: reduceMotion)
+                        VStack(spacing: 0) {
+                            Text(LaraL10n.text(en: "Enter Passcode", es: "Introduce el código"))
+                                .font(.system(size: width * 0.068))
+                                .foregroundStyle(.white)
+                                .padding(.top, proxy.size.height * 0.2)
+                            HStack(spacing: width * 0.045) {
+                                ForEach(0..<6, id: \.self) { _ in
+                                    Circle()
+                                        .strokeBorder(Color.white.opacity(0.85), lineWidth: 1)
+                                        .frame(width: width * 0.036, height: width * 0.036)
+                                }
+                            }
+                            .padding(.top, width * 0.05)
+                            .accessibilityHidden(true)
+
+                            LazyVGrid(
+                                columns: Array(repeating: GridItem(.fixed(key), spacing: width * 0.07), count: 3),
+                                spacing: width * 0.045
+                            ) {
+                                ForEach(Array(passcodeKeyLayout.enumerated()), id: \.offset) { _, keyId in
+                                    if let keyId, let digit = passcodeKeyMap[keyId] {
+                                        PasscodeKeyButton(
+                                            key: digit,
+                                            imageData: selectedKeys[digit.id],
+                                            onSelect: { showImagePicker = digit.id }
+                                        )
+                                    } else {
+                                        Color.clear.frame(width: key, height: key)
+                                    }
+                                }
+                            }
+                            .padding(.top, width * 0.1)
+
+                            Spacer(minLength: 0)
+
+                            HStack {
+                                Text(LaraL10n.text(en: "Emergency", es: "Emergencia"))
+                                Spacer()
+                                Text(LaraL10n.text(en: "Cancel", es: "Cancelar"))
+                            }
+                            .font(.system(size: width * 0.052))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, width * 0.11)
+                            .padding(.bottom, proxy.size.height * 0.05)
+                            .accessibilityHidden(true)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: 220)
+            .environment(\.colorScheme, .dark)
+
+            VStack(spacing: 2) {
+                Text(loadedStyleName ?? LaraL10n.text(en: "Your passcode", es: "Tu código"))
+                    .font(.headline)
+                Text(LaraL10n.text(en: "Tap a number to replace it", es: "Toca un número para cambiarlo"))
+                    .font(.caption)
+                    .opacity(0.6)
+            }
+            .multilineTextAlignment(.center)
+            .eagleBackdropText()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Eagle's styles at hand: a row of complete iPhones, each opening its sheet, and the gallery.
+    @ViewBuilder
+    private var stylesCarousel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(LaraL10n.text(en: "Eagle styles", es: "Estilos Eagle"))
+                    .font(.title3.weight(.bold))
+                Spacer()
+                NavigationLink {
+                    PasscodeExploreView(mgr: mgr) { url in
+                        let id = url.deletingPathExtension().lastPathComponent
+                        importPassthmFile(url: url, styleName: styleGallery.themes.first { $0.id == id }?.displayName)
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(LaraL10n.text(en: "See all", es: "Ver todos"))
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+            }
+            .eagleBackdropText()
+            .padding(.horizontal, 2)
+
+            if styleGallery.themes.isEmpty {
+                HStack(spacing: 10) {
+                    if styleGallery.isLoading {
+                        ProgressView()
+                    }
+                    Text(styleGallery.isLoading
+                        ? LaraL10n.text(en: "Loading styles…", es: "Cargando estilos…")
+                        : LaraL10n.text(en: "Styles could not be loaded.", es: "No se pudieron cargar los estilos."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 120)
+                .eagleHeaderCard()
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 14) {
+                        // Most liked first, with the same like button and HOT tag as the gallery.
+                        let themes = likes.sortedByLikes(styleGallery.themes, .passcode, id: \.id)
+                        let hotID = likes.hottest(.passcode, among: themes.map(\.id))
+                        let favoriteIDs = EaglePasscodeFavorites.decode(favoriteStyleIDsJSON)
+                        ForEach(themes) { theme in
+                            PasscodeStyleThumbnail(
+                                theme: theme,
+                                previewURL: styleGallery.previewURL(for: theme),
+                                isDownloading: styleGallery.isDownloading(theme),
+                                isFavorite: favoriteIDs.contains(theme.id),
+                                isSelected: theme.displayName == loadedStyleName,
+                                isHot: theme.id == hotID,
+                                onLike: { toggleStyleLike(theme) },
+                                onOpen: { openedStyle = theme }
+                            )
+                            .frame(width: 86)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 6)
+                }
+                .padding(.horizontal, -18)
+            }
+        }
+    }
+
+    private func toggleStyleLike(_ theme: PasscodeGalleryTheme) {
+        var favoriteIDs = EaglePasscodeFavorites.decode(favoriteStyleIDsJSON)
+        let liked = favoriteIDs.insert(theme.id).inserted
+        if !liked {
+            favoriteIDs.remove(theme.id)
+        }
+        favoriteStyleIDsJSON = EaglePasscodeFavorites.encode(favoriteIDs)
+        EagleLikes.shared.setLiked(.passcode, theme.id, liked: liked)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func useStyle(_ theme: PasscodeGalleryTheme) async {
+        do {
+            let url = try await styleGallery.downloadAndImport(theme)
+            importPassthmFile(url: url, styleName: theme.displayName)
+        } catch {
+            statusMessage = "Error: \(error.localizedDescription)"
+        }
+    }
+
     func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
@@ -538,7 +605,8 @@ struct PasscodeView: View {
         }
     }
     
-    func importPassthmFile(url: URL) {
+    func importPassthmFile(url: URL, styleName: String? = nil) {
+        let name = styleName ?? url.deletingPathExtension().lastPathComponent
         processing = true
         statusMessage = LaraL10n.text(en: "Importing style…", es: "Importando estilo…")
         
@@ -569,6 +637,7 @@ struct PasscodeView: View {
                     for (keyId, imageData) in extractedKeys {
                         selectedKeys[keyId] = imageData
                     }
+                    if !extractedKeys.isEmpty { loadedStyleName = name }
                     processing = false
                     statusMessage = LaraL10n.text(
                         en: "Imported \(extractedKeys.count) digits.",
@@ -850,23 +919,19 @@ struct PasscodeKeyButton: View {
                             .clipShape(Circle())
                     } else {
                         Text(key.digit)
-                            .font(.system(size: 30, weight: .medium, design: .rounded))
+                            .font(.system(size: geo.size.width * 0.46, weight: .regular))
                             .foregroundStyle(.white)
                     }
 
                     Circle()
                         .strokeBorder(
-                            isCustom ? Color.purple.opacity(0.9) : Color.white.opacity(0.12),
-                            lineWidth: isCustom ? 1.5 : 1
+                            Color.white.opacity(isCustom ? 0 : 0.12),
+                            lineWidth: 1
                         )
                 }
                 .frame(
                     width: geo.size.width,
                     height: geo.size.width
-                )
-                .shadow(
-                    color: isCustom ? Color.purple.opacity(0.45) : .clear,
-                    radius: isCustom ? 7 : 0
                 )
             }
             .aspectRatio(1, contentMode: .fit)

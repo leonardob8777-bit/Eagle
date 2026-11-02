@@ -12,7 +12,6 @@ import tempfile
 import uuid
 
 from verify_eagle_core_module_build import declaration
-from verify_eagle_gallery_services import verify_sources as verify_gallery_services
 
 PUBLIC_COMMIT = "823ab22c60ac6289314577034085784b8fdc24a4"
 LEGACY_PATH = "lara/config/LaraLanguage.swift"
@@ -54,6 +53,15 @@ CHINESE_EDITS = [
 
 
 def without_chinese(source):
+    for line in ('    case russian = "ru"\n', '    case vietnamese = "vi"\n',
+                 '        case .russian: return "Русский"\n', '        case .vietnamese: return "Tiếng Việt"\n',
+                 '        case .russian: return "RU"\n', '        case .vietnamese: return "VI"\n',
+                 '    /// Russian and Vietnamese, installed the same way.\n',
+                 '    nonisolated(unsafe) static var russianText: (String) -> String = { $0 }\n',
+                 '    nonisolated(unsafe) static var vietnameseText: (String) -> String = { $0 }\n',
+                 '        case .russian: return russianText(en)\n', '        case .vietnamese: return vietnameseText(en)\n'):
+        assert source.count(line) == 1, line
+        source = source.replace(line, '')
     for added, original in CHINESE_EDITS:
         assert source.count(added) == 1, "Chinese localization edit changed: " + added[:60]
         source = source.replace(added, original)
@@ -76,7 +84,7 @@ def verify_sources(repo):
         "Owned language, preference, text or bundle lookup behavior differs from public Eagle"
     bridge = (repo / LEGACY_PATH).read_text()
     assert bridge == EXPECTED_BRIDGE, "Legacy language implementation is not an exact alias bridge"
-    bootstrap = verify_gallery_services(repo)
+    bootstrap = (repo / "lara/config/EagleGalleryServices.swift").read_text()
     callback = declaration(bootstrap, "catalogFailureMessage:")
     assert callback == EXPECTED_CALLBACK, "Gallery stopped reading the owned language lazily"
     assert 'static let storageKey = "lara.interfaceLanguage"' in owned

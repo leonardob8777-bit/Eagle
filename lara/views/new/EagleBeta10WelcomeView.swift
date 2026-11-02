@@ -260,13 +260,13 @@ struct EagleBeta10WelcomeView: View {
                 EagleWordmark(logoSize: 58, nameSize: 34, spacing: 12)
 
                 Text(LaraL10n.text(
-                    en: "A more polished Eagle.",
-                    es: "Una Eagle más pulida."
+                    en: "Eagle, now with likes.",
+                    es: "Eagle, ahora con likes."
                 ))
                     .font(.headline)
                     .multilineTextAlignment(.center)
 
-                Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.6")  •  \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "95")")
+                Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.7")  •  \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "102")")
                     .font(.caption.monospacedDigit().weight(.bold))
                     .foregroundStyle(EagleVisualTheme.secondaryText(for: colorScheme))
                     .padding(.horizontal, 12)
@@ -333,47 +333,87 @@ struct EagleBeta10WelcomeView: View {
     private var updatesCard: some View {
         welcomeCard {
             welcomeSectionTitle(
-                "Eagle \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.6")",
+                "Eagle \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.7")",
                 systemImage: "sparkles",
                 color: .primary
             )
             welcomeRow(
-                icon: "character.bubble",
+                icon: "heart.fill",
                 color: .primary,
-                title: LaraL10n.text(en: "Simplified Chinese", es: "Chino simplificado"),
+                title: LaraL10n.text(en: "Likes and HOT", es: "Likes y HOT"),
                 detail: LaraL10n.text(
-                    en: "Choose 简体中文 from the language menu. Interface text updates without reopening Eagle.",
-                    es: "Elige 简体中文 en el menú de idioma. La interfaz cambia sin volver a abrir Eagle."
+                    en: "Like wallpapers, passcode styles, and Dock and Island themes. The most liked come first and wear HOT.",
+                    es: "Da like a fondos, estilos de código y temas de Dock e Isla. Los más gustados salen primero con HOT."
                 )
             )
 
             welcomeRow(
-                icon: "sparkles",
+                icon: "person.fill",
                 color: .primary,
-                title: LaraL10n.text(en: "A new arrival", es: "Una nueva entrada"),
+                title: LaraL10n.text(en: "People online", es: "Personas en línea"),
                 detail: LaraL10n.text(
-                    en: "A new logo opening and a circular reveal from Get started, with smoother transitions.",
-                    es: "Nueva apertura con el logo y entrada circular desde Empezar, con transiciones más suaves."
+                    en: "See how many people have Eagle open right now, on Customize and Access.",
+                    es: "Mira cuántas personas tienen Eagle abierto ahora mismo, en Customize y Acceso."
                 )
             )
 
             welcomeRow(
-                icon: "rectangle.bottomthird.inset.filled",
+                icon: "globe",
                 color: .primary,
-                title: LaraL10n.text(en: "Actions within reach", es: "Acciones a mano"),
+                title: LaraL10n.text(en: "Now in Russian and Vietnamese", es: "Ahora en ruso y vietnamita"),
                 detail: LaraL10n.text(
-                    en: "Fixed Apply and Prepare controls. Dock Gallery now shares Island Gallery’s control layout.",
-                    es: "Aplicar y Preparar quedan a mano. Dock Gallery comparte la distribución de controles de Island Gallery."
+                    en: "Choose Русский or Tiếng Việt in Settings → Language. Eagle now speaks English, Spanish, Chinese, Russian and Vietnamese.",
+                    es: "Elige Русский o Tiếng Việt en Ajustes → Idioma. Eagle ya habla inglés, español, chino, ruso y vietnamita."
                 )
             )
 
             welcomeRow(
-                icon: "photo.stack",
+                icon: "circle.grid.3x3.fill",
                 color: .primary,
-                title: LaraL10n.text(en: "31 new Dock backgrounds", es: "31 nuevos fondos de Dock"),
+                title: LaraL10n.text(en: "25 new passcode styles", es: "25 estilos de código nuevos"),
                 detail: LaraL10n.text(
-                    en: "18 Static and 13 Live themes, downloaded from the gallery when you choose them.",
-                    es: "18 temas Static y 13 Live que se descargan desde la galería cuando los eliges."
+                    en: "15 sets of symbols instead of numbers, like Planets, Iced Out, Sports or Manga Tokyo, plus 10 number styles.",
+                    es: "15 juegos de símbolos en vez de números, como Planetas, Iced Out, Deportes o Manga Tokio, y 10 estilos de números."
+                )
+            )
+
+            welcomeRow(
+                icon: "photo.on.rectangle",
+                color: .primary,
+                title: LaraL10n.text(en: "New wallpapers without updating", es: "Fondos nuevos sin actualizar"),
+                detail: LaraL10n.text(
+                    en: "New wallpapers and passcode styles arrive online, no new version needed. What's new wears NEW for a week.",
+                    es: "Los fondos y estilos de código nuevos llegan en línea, sin otra versión. Lo nuevo lleva NEW durante una semana."
+                )
+            )
+
+            welcomeRow(
+                icon: "iphone",
+                color: .primary,
+                title: LaraL10n.text(en: "Redesigned galleries", es: "Galerías rediseñadas"),
+                detail: LaraL10n.text(
+                    en: "Wallpapers, Passcode, Styles, Card, Dock and App Name Color, with complete iPhone previews and fewer buttons.",
+                    es: "Fondos, Código, Estilos, Tarjeta, Dock y Color de nombres, con iPhones completos y menos botones."
+                )
+            )
+
+            welcomeRow(
+                icon: "ipad",
+                color: .primary,
+                title: LaraL10n.text(en: "Prepare on compatible iPads", es: "Preparar en iPads compatibles"),
+                detail: LaraL10n.text(
+                    en: "Compatible iPads can use Prepare on supported iPadOS versions. Individual effects still need testing on iPad.",
+                    es: "Los iPads compatibles pueden usar Preparar en las versiones admitidas de iPadOS. Los efectos aún necesitan pruebas en iPad."
+                )
+            )
+
+            welcomeRow(
+                icon: "arrow.down.circle",
+                color: .primary,
+                title: LaraL10n.text(en: "A much lighter Eagle", es: "Una Eagle mucho más ligera"),
+                detail: LaraL10n.text(
+                    en: "Wallpaper previews download when you open them, keeping the app smaller.",
+                    es: "Las vistas previas se descargan al abrirlas para mantener la app más ligera."
                 )
             )
         }
@@ -387,22 +427,52 @@ struct EagleBeta10WelcomeView: View {
                 color: .primary
             )
             welcomeRow(
-                icon: "iphone",
+                icon: "character.bubble",
                 color: .primary,
-                title: LaraL10n.text(en: "Clearer controls", es: "Controles más claros"),
+                title: LaraL10n.text(en: "One language at a time", es: "Un solo idioma"),
                 detail: LaraL10n.text(
-                    en: "Solid preview buttons, readable disabled actions and unclipped switches. Clearer text over the gradient.",
-                    es: "Botones de vista previa sólidos, acciones desactivadas legibles e interruptores sin recortes. Textos más claros sobre el degradado."
+                    en: "No more English and Spanish mixed together. Wallpaper and passcode names follow your language.",
+                    es: "Ya no se mezclan inglés y español. Los nombres de fondos y códigos siguen tu idioma."
                 )
             )
 
             welcomeRow(
-                icon: "hand.tap",
+                icon: "lock.shield",
                 color: .primary,
-                title: LaraL10n.text(en: "Touch and motion", es: "Toques y movimiento"),
+                title: LaraL10n.text(en: "Prepare when you need it", es: "Preparar cuando lo necesitas"),
                 detail: LaraL10n.text(
-                    en: "Smoother tabs and scrolling, clearer Prepare progress and a unified loading ring. Hidden effects pause.",
-                    es: "Pestañas y desplazamiento más fluidos, progreso de Preparar más claro y un mismo aro de carga. Los efectos ocultos se pausan."
+                    en: "In Passcode, Prepare appears inside the style you open. Once ready, the same button says Use style.",
+                    es: "En Código, Preparar aparece dentro del estilo que abres. Cuando está listo, el mismo botón dice Usar estilo."
+                )
+            )
+
+            welcomeRow(
+                icon: "bell",
+                color: .primary,
+                title: LaraL10n.text(en: "Better notifications", es: "Mejores notificaciones"),
+                detail: LaraL10n.text(
+                    en: "Tap or swipe up to close them. They speak your language and show the icon of each section.",
+                    es: "Tócalas o desliza hacia arriba para cerrarlas. Salen en tu idioma y con el icono de cada sección."
+                )
+            )
+
+            welcomeRow(
+                icon: "bolt",
+                color: .primary,
+                title: LaraL10n.text(en: "Faster previews", es: "Vistas previas más rápidas"),
+                detail: LaraL10n.text(
+                    en: "Wallpaper and passcode previews are much lighter, so the galleries load sooner.",
+                    es: "Las vistas previas de fondos y códigos pesan mucho menos, así que las galerías cargan antes."
+                )
+            )
+
+            welcomeRow(
+                icon: "gearshape",
+                color: .primary,
+                title: LaraL10n.text(en: "Settings, renewed", es: "Ajustes renovado"),
+                detail: LaraL10n.text(
+                    en: "Language and the Eagle background now live in Settings. Icon Studio is set aside for now.",
+                    es: "El idioma y el fondo Eagle ahora están en Ajustes. Icon Studio se retira por ahora."
                 )
             )
         }

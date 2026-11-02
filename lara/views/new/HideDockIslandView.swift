@@ -208,7 +208,7 @@ struct HideDockIslandView: View {
         }
         .onChange(of: notice?.id) { _ in
             guard let value = notice, !value.offersRespring else { return }
-            EagleNotifications.shared.show(title: "Hide Dock + Island", message: value.message)
+            EagleNotifications.shared.show(title: LaraL10n.text(en: "Hide Dock + Island", es: "Ocultar Dock + Isla"), message: value.message)
             notice = nil
         }
         .alert(item: Binding(get: { notice?.offersRespring == true ? notice : nil }, set: { notice = $0 })) { notice in
@@ -356,7 +356,7 @@ struct HideDockIslandView: View {
             if result.offersRespring {
                 notice = HideSurfacesNotice(message: result.message, offersRespring: true)
             } else {
-                EagleNotifications.shared.result(result.succeeded, title: "Hide Dock", message: result.message)
+                EagleNotifications.shared.result(result.succeeded, title: LaraL10n.text(en: "Hide Dock", es: "Ocultar Dock"), message: result.message)
             }
         }
     }

@@ -200,7 +200,7 @@ private struct EagleBeta10AccessView: View {
     }
 
     private var accessHeader: some View {
-        EagleHeaderBar(language: $language, showsBackdropToggle: true) {
+        EagleHeaderBar(language: $language) {
             showingSettings = true
         }
     }

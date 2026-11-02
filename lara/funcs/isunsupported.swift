@@ -132,7 +132,9 @@ func devicemachine() -> String {
 }
 
 func hasmie(machine: String) -> Bool {
-    machine.hasPrefix("iPhone18,")
+    // iPad17,* is the M5 family. Keep it outside Prepare just as the
+    // iPhone18,* A19 family is, before touching offsets or DarkSword.
+    machine.hasPrefix("iPhone18,") || machine.hasPrefix("iPad17,")
 }
 
 func hasmie() -> Bool {
@@ -228,6 +230,11 @@ func eagleSupportAssessment(
         return EagleSupportAssessment(status: .unsupported, reason: .belowIOS16)
 
     case 16:
+        // The 16.7.2 report belongs to an iPhone. No iPadOS 16 route has been
+        // validated for Eagle, so do not promote that one-device exception.
+        if machine.hasPrefix("iPad") {
+            return EagleSupportAssessment(status: .possible, reason: .ios16Experimental)
+        }
         if version.minorVersion == 7, version.patchVersion == 2 {
             return EagleSupportAssessment(
                 status: .testedNeedsMoreTesting,

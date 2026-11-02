@@ -89,7 +89,7 @@ struct LaraAccessView: View {
                 EagleNotifications.shared.result(true, title: "Eagle",
                     message: LaraL10n.text(en: "Access is ready", es: "Acceso preparado"))
             case .failed(let message):
-                EagleNotifications.shared.result(false, title: "Prepare", message: message)
+                EagleNotifications.shared.result(false, title: LaraL10n.text(en: "Prepare", es: "Preparar"), message: message)
             default: break
             }
         }

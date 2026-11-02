@@ -14,7 +14,7 @@ import Foundation
         precondition((Bundle.main.path(forResource: "en", ofType: "lproj") != nil) == hasResources)
 
         // The public English and Spanish stay first and unchanged; Simplified Chinese was added after them.
-        precondition(EagleLanguage.allCases.map(\.rawValue) == ["en", "es", "zh-Hans"])
+        precondition(EagleLanguage.allCases.map(\.rawValue) == ["en", "es", "zh-Hans", "ru", "vi"])
         precondition(Array(EagleLanguage.allCases.prefix(2)).map(\.rawValue) == PublicLanguage.allCases.map(\.rawValue))
         precondition(EagleLanguage.chinese.displayName == "简体中文" && EagleLanguage.chinese.shortName == "中文")
         for (index, language) in EagleLanguage.allCases.prefix(2).enumerated() {
@@ -27,6 +27,17 @@ import Foundation
             precondition(language.shortName == ["EN", "ES"][index])
             precondition(language.shortName == reference.shortName)
         }
+
+        precondition(EagleLanguage.russian.displayName == "Русский" && EagleLanguage.russian.shortName == "RU")
+        precondition(EagleLanguage.vietnamese.displayName == "Tiếng Việt" && EagleLanguage.vietnamese.shortName == "VI")
+        EagleLocalization.russianText = { "RU:" + $0 }
+        EagleLocalization.vietnameseText = { "VI:" + $0 }
+        for (raw, prefix) in [("ru", "RU:"), ("vi", "VI:")] {
+            defaults.setVolatileDomain([key: raw], forName: UserDefaults.argumentDomain)
+            precondition(EagleLocalization.language.rawValue == raw)
+            precondition(LaraL10n.text(en: "Ready", es: "Listo") == prefix + "Ready")
+        }
+        defaults.setVolatileDomain(savedArguments, forName: UserDefaults.argumentDomain)
 
         // Reuse one captured production callback across changes: no cached language.
         let message = GalleryMessage.failure

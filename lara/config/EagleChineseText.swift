@@ -9,7 +9,7 @@ enum EagleChineseText {
         lock.lock(); defer { lock.unlock() }
         if let cached = cache[english] { return cached }
         var result = english
-        for template in templates {
+        for template in matchingTemplates {
             if let values = match(english, fragments: template.english) {
                 var text = template.chinese
                 for (index, value) in values.enumerated() {
@@ -28,7 +28,8 @@ enum EagleChineseText {
     nonisolated(unsafe) private static var cache: [String: String] = [:]
 
     /// The values in `text` between the template's fixed fragments, or nil if it does not match.
-    private static func match(_ text: String, fragments: [String]) -> [String]? {
+    /// Shared with `EagleRussianText` and `EagleVietnameseText`.
+    static func match(_ text: String, fragments: [String]) -> [String]? {
         guard let first = fragments.first, text.hasPrefix(first) else { return nil }
         var rest = Substring(text.dropFirst(first.count))
         var values: [String] = []
@@ -49,6 +50,11 @@ enum EagleChineseText {
     }
 
     private struct Template { let english: [String]; let chinese: String }
+
+    // Match specific messages before broad prefixes such as "Apply ".
+    private static let matchingTemplates = templates.sorted {
+        $0.english.reduce(0) { $0 + $1.count } > $1.english.reduce(0) { $0 + $1.count }
+    }
 
     private static let templates: [Template] = [
         Template(english: ["", " Home page recorded"], chinese: "已记录 {0} 个主屏幕页面"),
@@ -437,6 +443,23 @@ enum EagleChineseText {
         "Discover": "发现",
         "Dock Capacity": "程序坞容量",
         "Dock Gallery": "程序坞图库",
+        "Fonts": "字体",
+        "Emoji": "表情",
+        "Hide Dock + Island": "隐藏程序坞和灵动岛",
+        "Hide Dock": "隐藏程序坞",
+        "Now in Russian and Vietnamese": "现已支持俄语和越南语",
+        "Choose Русский or Tiếng Việt in Settings → Language. Eagle now speaks English, Spanish, Chinese, Russian and Vietnamese.": "在“设置”→“语言”中选择 Русский 或 Tiếng Việt。Eagle 现已支持英语、西班牙语、中文、俄语和越南语。",
+        "25 new passcode styles": "25 款全新密码样式",
+        "15 sets of symbols instead of numbers, like Planets, Iced Out, Sports or Manga Tokyo, plus 10 number styles.": "15 套用符号代替数字的样式，如行星、冰钻、运动或漫画东京，另有 10 款数字样式。",
+        "New wallpapers without updating": "无需更新即可获得新壁纸",
+        "New wallpapers and passcode styles arrive online, no new version needed. What's new wears NEW for a week.": "新壁纸和密码样式在线推送，无需新版本。新内容会显示 NEW 标签一周。",
+        "Prepare when you need it": "需要时再准备",
+        "In Passcode, Prepare appears inside the style you open. Once ready, the same button says Use style.": "在密码中，准备按钮会出现在你打开的样式里。准备好后，同一个按钮会显示“使用样式”。",
+        "Better notifications": "更好的通知",
+        "Tap or swipe up to close them. They speak your language and show the icon of each section.": "轻点或上滑即可关闭。通知使用你的语言，并显示各部分的图标。",
+        "Faster previews": "更快的预览",
+        "Wallpaper and passcode previews are much lighter, so the galleries load sooner.": "壁纸和密码预览更轻巧，图库加载更快。",
+        "Closes the notification": "关闭通知",
         "Dock and icons were not part of this recovery point.": "程序坞和图标不包含在此恢复点中。",
         "Dock color": "程序坞颜色",
         "Dock effect": "程序坞效果",
@@ -1193,5 +1216,115 @@ enum EagleChineseText {
         "the card": "卡片",
         "the passcode": "密码",
         "• A new restore never starts until the current files are protected.\n• A damaged checksum is blocked, not ignored.\n• Only Eagle-owned wallpaper additions are removed.\n• The newest 12 points are kept automatically.": "• 在当前文件受到保护之前，绝不会开始新的恢复。\n• 损坏的校验值会被阻止，而不是忽略。\n• 只会移除 Eagle 添加的壁纸。\n• 自动保留最新的 12 个恢复点。",
+        "Gallery": "图库",
+        "Personal collection": "个人收藏",
+        "Eagle Gallery": "Eagle 图库",
+        "Watch video preview": "观看视频预览",
+        "Save or share image": "保存或分享图片",
+        "Emergency": "紧急呼叫",
+        "Your passcode": "你的密码",
+        "Tap a number to replace it": "轻点数字即可替换",
+        "Eagle styles": "Eagle 样式",
+        "See all": "查看全部",
+        "Styles could not be loaded.": "无法加载样式。",
+        "Preview only for now": "目前仅可预览",
+        "Matching wallpaper": "配套壁纸",
+        "More options": "更多选项",
+        "Import .passthm file": "导入 .passthm 文件",
+        "Animated": "动态",
+        "Favorite": "收藏",
+        "One photo styles your whole iPhone": "一张照片装点整部 iPhone",
+        "Create with your own": "用你自己的素材创作",
+        "Animated wallpaper": "动态壁纸",
+        "From one of your videos": "来自你的一段视频",
+        "Passcode digits": "密码数字",
+        "A style or your own images": "一种样式或你自己的图片",
+        "A design for your Wallet card": "为你的钱包卡片设计外观",
+        "Restore originals": "恢复原始文件",
+        "Clear downloads": "清空下载",
+        "Restore the originals?": "要恢复原始文件吗？",
+        "Restore changes": "恢复更改",
+        "Eagle will restore the passcode and card backups and remove the wallpapers added from Styles.": "Eagle 将恢复密码和卡片的备份，并移除从样式中添加的壁纸。",
+        "Current style": "当前样式",
+        "Undo": "撤销",
+        "No ending shown": "未显示尾号",
+        "Edit card ending": "编辑卡片尾号",
+        "Restore original": "恢复原始",
+        "Choose from Photos": "从照片中选择",
+        "Choose from Files": "从文件中选择",
+        "Change design": "更换设计",
+        "Looking for cards…": "正在查找卡片…",
+        "No cards found": "未找到卡片",
+        "Add a compatible card to Wallet, then search again.": "请在钱包中添加兼容的卡片，然后再次搜索。",
+        "Search again": "重新搜索",
+        "Original idea by drkm9743": "原始创意来自 drkm9743",
+        "Search for cards": "搜索卡片",
+        "Restart interface": "重启界面",
+        "OK": "好",
+        "Ending": "尾号",
+        "After applying, drag apps into the new spaces. A respring returns the standard Dock.": "应用后，将 App 拖入新空位。注销后会恢复标准 Dock。",
+        "Messages": "信息",
+        "Music": "音乐",
+        "Camera": "相机",
+        "Photos": "照片",
+        "Maps": "地图",
+        "Weather": "天气",
+        "How it works": "工作原理",
+        "Only the names on the current Home page change.": "只会更改当前主屏幕页面上的名称。",
+        "Visit the Home page you want, reopen Eagle, then apply. Dock, folders, App Library, Dynamic Island, and Prepare are excluded.": "先前往想要的主屏幕页面，再重新打开 Eagle 并应用。Dock、文件夹、App 资源库、灵动岛和准备不受影响。",
+        "Made by Leonardo": "由 Leonardo 制作",
+        "Not ready": "未就绪",
+        "General": "通用",
+        "Keep Alive lets Eagle keep working while it is in the background.": "保持运行可让 Eagle 在后台继续工作。",
+        "Hide log dividers": "隐藏日志分隔线",
+        "App folders shown as": "App 文件夹显示为",
+        "Search inside folders": "在文件夹内搜索",
+        "File Manager in tabs": "在标签栏显示文件管理器",
+        "App name": "App 名称",
+        "Modify offsets": "修改偏移量",
+        "Fetching kernelcache…": "正在获取 kernelcache…",
+        "Fetch kernelcache": "获取 kernelcache",
+        "Importing kernelcache…": "正在导入 kernelcache…",
+        "Import kernelcache": "导入 kernelcache",
+        "How to get a kernelcache": "如何获取 kernelcache",
+        "Clear kernelcache data?": "要清除 kernelcache 数据吗？",
+        "This deletes all kernelcache data and saved offsets. You will need to fetch them again to use Eagle.": "这将删除所有 kernelcache 数据和已保存的偏移量。你需要重新获取才能使用 Eagle。",
+        "Remove kernelcache": "移除 kernelcache",
+        "Prepare Eagle before fetching the kernelcache.": "获取 kernelcache 前请先准备 Eagle。",
+        "Stash KRW primitives": "保存 KRW 原语",
+        "iOS 16 warning": "iOS 16 提示",
+        "Keep SpringBoard RemoteCall alive": "保持 SpringBoard RemoteCall",
+        "KRW stashed": "KRW 已保存",
+        "Could not stash KRW": "无法保存 KRW",
+        "Stashing KRW to launchd…": "正在将 KRW 保存到 launchd…",
+        "Stash KRW to launchd now": "立即将 KRW 保存到 launchd",
+        "Allow more than 10 Dock icons": "允许 Dock 超过 10 个图标",
+        "If Eagle closes while RemoteCall is active, SpringBoard may respring.": "如果在 RemoteCall 运行时关闭 Eagle，SpringBoard 可能会注销。",
+        "On a Mac:": "在 Mac 上：",
+        "Eagle, now with likes.": "Eagle，现在可以点赞了。",
+        "Likes and HOT": "点赞与 HOT",
+        "Like wallpapers, passcode styles, and Dock and Island themes. The most liked come first and wear HOT.": "为壁纸、密码样式以及 Dock 和灵动岛主题点赞。最受欢迎的排在最前，并带有 HOT 标签。",
+        "People online": "在线人数",
+        "See how many people have Eagle open right now, on Customize and Access.": "在“自定义”和“访问”中查看此刻有多少人正在使用 Eagle。",
+        "Redesigned galleries": "全新设计的图库",
+        "Wallpapers, Passcode, Styles, Card, Dock and App Name Color, with complete iPhone previews and fewer buttons.": "壁纸、密码、样式、卡片、Dock 和 App 名称颜色，采用完整的 iPhone 预览，按钮更少。",
+        "A much lighter Eagle": "更轻巧的 Eagle",
+        "Wallpaper previews download when you open them, keeping the app smaller.": "壁纸预览在打开时才下载，让 App 更轻巧。",
+        "One language at a time": "一次一种语言",
+        "No more English and Spanish mixed together. Wallpaper and passcode names follow your language.": "不再混用英语和西班牙语。壁纸和密码样式的名称会跟随你的语言。",
+        "Settings, renewed": "全新设置",
+        "Language and the Eagle background now live in Settings. Icon Studio is set aside for now.": "语言和 Eagle 背景现在位于设置中。Icon Studio 暂时移除。",
+        "Eagle sent the wallpaper to Wallpapers. If it is not there yet, close Wallpapers from the app switcher and look in Collections.": "Eagle 已将壁纸发送到“墙纸”。如果还没出现，请从 App 切换器关闭“墙纸”，然后在“精选”中查找。",
+        "Skip": "跳过",
+        "Like what you love": "给你喜欢的点赞",
+        "People on Eagle now": "正在使用 Eagle 的人",
+        "Tap the heart on any wallpaper, passcode, dock or island. The most liked come first, and number one wears the HOT tag.": "点按任意壁纸、密码、程序坞或灵动岛上的爱心。点赞最多的排在最前，第一名带有 HOT 标签。",
+        "At the top, under Settings, you see how many people have Eagle open. Red when fewer than 5, green from 5.": "在顶部“设置”下方，可以看到有多少人正打开着 Eagle。少于 5 人时为红色，5 人及以上为绿色。",
+        "Got it": "知道了",
+        "Next": "下一步",
+        "Under 5": "少于 5",
+        "5 or more": "5 或更多",
+        "Prepare on compatible iPads": "在兼容的 iPad 上准备",
+        "Compatible iPads can use Prepare on supported iPadOS versions. Individual effects still need testing on iPad.": "兼容的 iPad 可在支持的 iPadOS 版本上使用准备功能。各项效果仍需在 iPad 上测试。",
     ]
 }

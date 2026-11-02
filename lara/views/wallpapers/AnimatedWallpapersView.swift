@@ -32,14 +32,60 @@ private enum WallpaperMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         self == .explore
-            ? LaraL10n.text(en: "Eagle themes", es: "Temas Eagle")
+            ? LaraL10n.text(en: "Gallery", es: "Galería")
             : LaraL10n.text(en: "Create", es: "Crear")
+    }
+}
+
+/// The Gallery / Create switch: a compact capsule that hugs its two options instead of a full-width
+/// segmented control, with the chosen option sliding under the finger.
+private struct WallpaperModeTabs: View {
+    @Binding var mode: WallpaperMode
+    @Namespace private var selection
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(WallpaperMode.allCases) { option in
+                let selected = option == mode
+                Button {
+                    guard !selected else { return }
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) { mode = option }
+                } label: {
+                    Text(option.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(selected ? EagleVisualTheme.actionText : Color.primary.opacity(0.62))
+                        .padding(.horizontal, 18)
+                        .frame(height: 34)
+                        .background {
+                            if selected {
+                                Capsule()
+                                    .fill(EagleVisualTheme.actionFill)
+                                    .matchedGeometryEffect(id: "tab", in: selection)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
+        .overlay { Capsule().strokeBorder(Color.primary.opacity(0.07), lineWidth: 1) }
     }
 }
 
 struct AnimatedWallpapersView: View {
     @ObservedObject private var mgr = laramgr.shared
     @StateObject private var installer = AnimatedWallpaperInstaller()
+    /// Observed so Add appears as soon as PosterBoard's UUID is saved.
+    @AppStorage(EaglePosterBoardUUID.storageKey) private var savedPosterBoardUUID = ""
+
+    /// Prepared access, or PosterBoard's saved UUID: Prepare is only needed while neither exists.
+    private var canInstall: Bool {
+        mgr.sbxready || (!savedPosterBoardUUID.isEmpty && EaglePosterBoardUUID.allowsInstallWithoutPreparing)
+    }
 
     @State private var pickerItem: PhotosPickerItem?
     @State private var movieURL: URL?
@@ -54,15 +100,9 @@ struct AnimatedWallpapersView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker(LaraL10n.text(en: "Mode", es: "Modo"), selection: $mode) {
-                ForEach(WallpaperMode.allCases) { option in
-                    Text(option.title).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 14)
+            WallpaperModeTabs(mode: $mode)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
 
             if mode == .explore {
                 WallpaperGalleryView()
@@ -119,8 +159,8 @@ struct AnimatedWallpapersView: View {
             .padding(.bottom, 40)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if movieURL != nil || !mgr.sbxready {
-                EagleApplyBar(ready: mgr.sbxready) {
+            if movieURL != nil || !canInstall {
+                EagleApplyBar(ready: canInstall) {
                     installArea
                 }
             }
@@ -306,7 +346,7 @@ struct AnimatedWallpapersView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(EagleApplyButtonStyle(busy: installer.isWorking))
-                .disabled(!mgr.sbxready || installer.isWorking)
+                .disabled(!canInstall || installer.isWorking)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: installer.isWorking)
@@ -431,7 +471,8 @@ final class AnimatedWallpaperInstaller: ObservableObject {
     private let cancellation = AnimatedWallpaperCancellation()
 
     func install(video: URL, autoReverses: Bool) {
-        guard !isWorking, laramgr.shared.sbxready else { return }
+        let prepared = laramgr.shared.sbxready
+        guard !isWorking, prepared || EaglePosterBoardUUID.allowsInstallWithoutPreparing else { return }
 
         cancellation.reset()
 
@@ -470,17 +511,29 @@ final class AnimatedWallpaperInstaller: ObservableObject {
                 _ = try PosterBoardWriter.install(descriptor: build.descriptorURL)
 
                 await MainActor.run {
-                    let refreshed = PosterBoardWriter.refreshCollections()
-                    globallogger.log("(wallpaper) collection refresh requested, success=\(refreshed)")
+                    // As in the gallery: the refresh only on the prepared route (Coconut does none).
+                    if prepared {
+                        let refreshed = PosterBoardWriter.refreshCollections()
+                        globallogger.log("(wallpaper) collection refresh requested, success=\(refreshed)")
+                    }
                     self.progress = 1
                     self.progressLabel = LaraL10n.text(en: "Done", es: "Listo")
                     self.isWorking = false
                     self.didInstall = true
-                    self.resultMessage = LaraL10n.text(
-                        en: "Imported and verified. Open Wallpapers, select the new wallpaper, then close Wallpapers from the app switcher if it does not appear immediately.",
-                        es: "Importado y verificado. Abre Fondos, selecciona el fondo nuevo y, si no aparece de inmediato, cierra Fondos desde el selector de apps."
-                    )
+                    self.resultMessage = prepared
+                        ? LaraL10n.text(
+                            en: "Imported and verified. Open Wallpapers, select the new wallpaper, then close Wallpapers from the app switcher if it does not appear immediately.",
+                            es: "Importado y verificado. Abre Fondos, selecciona el fondo nuevo y, si no aparece de inmediato, cierra Fondos desde el selector de apps."
+                        )
+                        // Saved-UUID route: the copy cannot be read back, so no "verified" claim.
+                        : LaraL10n.text(
+                            en: "Eagle sent the wallpaper to Wallpapers. If it is not there yet, close Wallpapers from the app switcher and look in Collections.",
+                            es: "Eagle envió el fondo a Fondos. Si todavía no aparece, cierra Fondos desde el selector de apps y búscalo en Colecciones."
+                        )
                 }
+                // Like Coconut: let the move settle, then open the wallpaper gallery.
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                await MainActor.run { _ = self.openWallpaperPicker() }
             } catch {
                 await MainActor.run {
                     self.isWorking = false
@@ -533,10 +586,18 @@ nonisolated enum PosterBoardWriter {
         preserveDescriptorName: Bool = false
     ) throws -> PosterBoardInstallResult {
         let fm = FileManager.default
-        guard let containerID = posterBoardContainerID() else {
+        // With Eagle prepared, PosterBoard's container is read on the device (and its UUID saved).
+        // Otherwise the saved UUID is used, as Coconut and Pocket Poster do: a write-only route that
+        // never reads PosterBoard's container.
+        let liveContainerID = EaglePosterBoardUUID.discoverAndSave()
+        let savedRouteAllowed = EaglePosterBoardUUID.supportsSavedUUID()
+        guard let containerID = liveContainerID ?? (savedRouteAllowed ? EaglePosterBoardUUID.saved : nil) else {
             throw AnimatedWallpaperError.posterBoardNotFound
         }
-        log("(wallpaper) Lara resolved the PosterBoard container on-device")
+        let canReadContainer = liveContainerID != nil
+        log(canReadContainer
+            ? "(wallpaper) Lara resolved the PosterBoard container on-device"
+            : "(wallpaper) using the saved PosterBoard UUID (write-only route)")
 
         let sourceFingerprint = try descriptorFingerprint(at: descriptor)
 
@@ -549,15 +610,28 @@ nonisolated enum PosterBoardWriter {
             .appendingPathComponent(extensionIdentifier, isDirectory: true)
             .appendingPathComponent("descriptors", isDirectory: true)
 
+        let destinationName = preserveDescriptorName
+            ? descriptor.lastPathComponent
+            : UUID().uuidString.uppercased()
+        let destination = target.appendingPathComponent(destinationName, isDirectory: true)
+
+        guard canReadContainer else {
+            // Saved-UUID route: nothing in PosterBoard's container can be checked beforehand.
+            try importThroughLaraBridge(
+                descriptor: descriptor,
+                destination: destination,
+                targetDirectory: target,
+                expectedFingerprint: sourceFingerprint,
+                canVerify: false
+            )
+            return PosterBoardInstallResult(destination: destination, wasCreated: true)
+        }
+
         guard fm.fileExists(atPath: target.deletingLastPathComponent().path) else {
             throw AnimatedWallpaperError.posterBoardUnavailable
         }
 
         try fm.createDirectory(at: target, withIntermediateDirectories: true)
-        let destinationName = preserveDescriptorName
-            ? descriptor.lastPathComponent
-            : UUID().uuidString.uppercased()
-        let destination = target.appendingPathComponent(destinationName, isDirectory: true)
 
         if fm.fileExists(atPath: destination.path) {
             let existingFingerprint = try descriptorFingerprint(at: destination)
@@ -694,7 +768,8 @@ nonisolated enum PosterBoardWriter {
         descriptor: URL,
         destination: URL,
         targetDirectory: URL,
-        expectedFingerprint: DescriptorFingerprint
+        expectedFingerprint: DescriptorFingerprint,
+        canVerify: Bool = true
     ) throws {
         let fm = FileManager.default
         let documents = ProcessInfo.processInfo.environment["LC_HOME_PATH"]
@@ -713,7 +788,8 @@ nonisolated enum PosterBoardWriter {
         var importCompleted = false
 
         defer {
-            if !importCompleted {
+            // The saved-UUID route cannot see the destination, so there is nothing it may remove.
+            if !importCompleted && canVerify {
                 try? fm.removeItem(at: destination)
             }
             try? fm.removeItem(at: staging)
@@ -738,6 +814,25 @@ nonisolated enum PosterBoardWriter {
         try fm.copyItem(at: descriptor, to: staging)
         var resultingURL: NSURL?
         try fm.trashItem(at: staging, resultingItemURL: &resultingURL)
+
+        guard canVerify else {
+            // iOS may report a move to the app's ordinary trash: when it names a destination, it must
+            // be PosterBoard's (Coconut's check). The same folder can appear as /var or /private/var.
+            if let resultingURL {
+                func comparable(_ url: URL) -> String {
+                    let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+                    return path.hasPrefix("/private/") ? String(path.dropFirst("/private".count)) : path
+                }
+                let actual = comparable(resultingURL as URL)
+                guard actual == comparable(destination) || actual.contains("/PRBPosterExtensionDataStore/") else {
+                    throw AnimatedWallpaperError.installationFailed
+                }
+            }
+            // Without access the copy cannot be read back; like Coconut, a clean move is the result.
+            importCompleted = true
+            log("(wallpaper) saved-UUID route moved \(destination.lastPathComponent) into PosterBoard")
+            return
+        }
 
         guard fm.fileExists(atPath: destination.path) else {
             throw AnimatedWallpaperError.installationFailed
@@ -770,21 +865,7 @@ nonisolated enum PosterBoardWriter {
     }
 
     private static func posterBoardContainerID() -> String? {
-        let fm = FileManager.default
-        let root = URL(fileURLWithPath: "/private/var/mobile/Containers/Data/Application", isDirectory: true)
-        guard let containers = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) else {
-            return nil
-        }
-
-        for container in containers {
-            let metadata = container.appendingPathComponent(".com.apple.mobile_container_manager.metadata.plist")
-            guard let dict = NSDictionary(contentsOf: metadata),
-                  let identifier = dict["MCMMetadataIdentifier"] as? String else { continue }
-            if identifier == "com.apple.PosterBoard" {
-                return container.lastPathComponent
-            }
-        }
-        return nil
+        EaglePosterBoardUUID.discoverAndSave()
     }
 
     private struct DescriptorFingerprint: Equatable {

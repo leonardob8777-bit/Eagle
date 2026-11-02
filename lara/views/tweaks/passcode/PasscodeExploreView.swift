@@ -8,7 +8,7 @@
 import SwiftUI
 import WebKit
 
-private enum EaglePasscodeFavorites {
+enum EaglePasscodeFavorites {
     static let storageKey = "eagle.passcode.favoriteThemeIDs"
 
     static func decode(_ value: String) -> Set<String> {
@@ -31,6 +31,7 @@ private enum EaglePasscodeFavorites {
 struct PasscodeExploreView: View {
     @ObservedObject var mgr: laramgr
     @ObservedObject private var gallery = PasscodeGalleryManager.shared
+    @ObservedObject private var likes = EagleLikes.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(EaglePasscodeFavorites.storageKey)
     private var favoriteThemeIDsJSON = "[]"
@@ -38,7 +39,7 @@ struct PasscodeExploreView: View {
     @State private var searchTerm = ""
     @State private var showsFavoritesOnly = false
     @State private var alertMessage: String?
-    @State private var previewTheme: PasscodeGalleryTheme?
+    @State private var openedTheme: PasscodeGalleryTheme?
     var onImport: ((URL) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     
@@ -51,14 +52,15 @@ struct PasscodeExploreView: View {
     }
 
     private var displayed: [PasscodeGalleryTheme] {
-        var themes = gallery.themes
+        // Most liked first.
+        var themes = likes.sortedByLikes(gallery.themes, .passcode, id: \.id)
         if showsFavoritesOnly {
             let favorites = EaglePasscodeFavorites.decode(favoriteThemeIDsJSON)
             themes = themes.filter { favorites.contains($0.id) }
         }
         guard !searchTerm.isEmpty else { return themes }
         return themes.filter {
-            "\($0.name) \($0.description) \($0.authorLine)".range(
+            "\($0.name) \($0.displayName) \($0.authorLine)".range(
                 of: searchTerm,
                 options: [.caseInsensitive, .diacriticInsensitive],
                 locale: .current
@@ -68,9 +70,9 @@ struct PasscodeExploreView: View {
 
     private var gridColumns: [GridItem] {
         if dynamicTypeSize.isAccessibilitySize {
-            return [GridItem(.flexible())]
+            return [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
         }
-        return [GridItem(.adaptive(minimum: 155), spacing: 12)]
+        return Array(repeating: GridItem(.flexible(), spacing: 14), count: 3)
     }
 
     var body: some View {
@@ -93,17 +95,18 @@ struct PasscodeExploreView: View {
                     }
                     .padding(.vertical, 50)
                 } else {
-                    LazyVGrid(columns: gridColumns, spacing: 12) {
+                    LazyVGrid(columns: gridColumns, spacing: 22) {
                         let favoriteIDs = EaglePasscodeFavorites.decode(favoriteThemeIDsJSON)
+                        let hotID = likes.hottest(.passcode, among: displayed.map(\.id))
                         ForEach(displayed) { theme in
                             PasscodeGalleryCard(
                                 theme: theme,
                                 previewURL: gallery.previewURL(for: theme),
                                 isDownloading: gallery.isDownloading(theme),
                                 isFavorite: favoriteIDs.contains(theme.id),
+                                isHot: theme.id == hotID,
                                 onToggleFavorite: { toggleFavorite(theme) },
-                                onPreview: { previewTheme = theme },
-                                onDownload: { Task { await handleDownload(theme) } }
+                                onOpen: { openedTheme = theme }
                             )
                         }
                     }
@@ -113,7 +116,7 @@ struct PasscodeExploreView: View {
             .padding(16)
         }
         .eagleScreenBackdrop()
-        .navigationTitle(LaraL10n.text(en: "Eagle passcode styles", es: "Estilos de código Eagle"))
+        .navigationTitle(LaraL10n.text(en: "Passcode styles", es: "Estilos de código"))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
             text: $searchTerm,
@@ -121,6 +124,9 @@ struct PasscodeExploreView: View {
         )
         .refreshable { await gallery.loadThemes(forceRefresh: true) }
         .task { if gallery.themes.isEmpty { await gallery.loadThemes() } }
+        .task {
+            await EagleLikes.shared.refresh(.passcode, favorites: EaglePasscodeFavorites.decode(favoriteThemeIDsJSON))
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
@@ -137,8 +143,10 @@ struct PasscodeExploreView: View {
             }
         }
         .eagleStatus($alertMessage, title: LaraL10n.text(en: "Passcode styles", es: "Estilos del código"))
-        .sheet(item: $previewTheme) { theme in
-            AnimatedPasscodePreviewView(theme: theme, gallery: gallery)
+        .sheet(item: $openedTheme) { theme in
+            PasscodeStyleSheet(theme: theme, gallery: gallery) {
+                Task { await handleDownload(theme) }
+            }
         }
     }
 
@@ -167,10 +175,12 @@ struct PasscodeExploreView: View {
 
     private func toggleFavorite(_ theme: PasscodeGalleryTheme) {
         var favorites = EaglePasscodeFavorites.decode(favoriteThemeIDsJSON)
-        if !favorites.insert(theme.id).inserted {
+        let liked = favorites.insert(theme.id).inserted
+        if !liked {
             favorites.remove(theme.id)
         }
         favoriteThemeIDsJSON = EaglePasscodeFavorites.encode(favorites)
+        EagleLikes.shared.setLiked(.passcode, theme.id, liked: liked)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -209,177 +219,263 @@ struct PasscodeExploreView: View {
     }
 }
 
+/// A complete iPhone at the screen's own proportions (1170 × 2532): the screen content fills the
+/// display, inside a thin black bezel whose corners follow the width. Used wherever Eagle shows a
+/// wallpaper or passcode capture, so they are never cropped and nothing is laid over them.
+struct EagleDeviceFrame<Screen: View>: View {
+    @ViewBuilder let screen: () -> Screen
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let bezel = max(2, width * 0.022)
+            let outer = width * 0.15
+            screen()
+                .frame(width: width - bezel * 2, height: proxy.size.height - bezel * 2)
+                .clipShape(RoundedRectangle(cornerRadius: outer - bezel, style: .continuous))
+                .padding(bezel)
+                .background(Color.black, in: RoundedRectangle(cornerRadius: outer, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: outer, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+                }
+        }
+        .aspectRatio(1170.0 / 2532.0, contentMode: .fit)
+    }
+}
+
 private struct PasscodeGalleryCard: View {
     let theme: PasscodeGalleryTheme
     let previewURL: URL?
     let isDownloading: Bool
     let isFavorite: Bool
+    let isHot: Bool
     let onToggleFavorite: () -> Void
-    let onPreview: () -> Void
-    let onDownload: () -> Void
+    let onOpen: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            LaraRemoteMediaPreview(
-                url: previewURL,
-                animated: false,
-                contentMode: .fit,
-                showsRetry: false
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 190)
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        // Long names shrink a little before they are cut short.
-                        Text(theme.name).font(.headline).lineLimit(1).minimumScaleFactor(0.8)
-                        Text(theme.authorLine)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                    }
-                    Spacer(minLength: 4)
-                    Button(action: onToggleFavorite) {
-                        Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .foregroundStyle(isFavorite ? Color.pink : Color.secondary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(EaglePressableStyle(kind: .swatch))
-                    .accessibilityLabel(isFavorite
-                        ? LaraL10n.text(en: "Remove from favorites", es: "Quitar de favoritos")
-                        : LaraL10n.text(en: "Add to favorites", es: "Agregar a favoritos"))
-                    .accessibilityValue(theme.name)
-                }
-
-                if !theme.description.isEmpty {
-                    Text(theme.description)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                if theme.hasAnimatedPreview {
-                    Button(action: onPreview) {
-                        Label(
-                            LaraL10n.text(en: "View animation", es: "Ver animación"),
-                            systemImage: "play.circle.fill"
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .eagleProminentLabel()
-                }
-
-                if theme.canInstall {
-                    Button(action: onDownload) {
-                        HStack {
-                            if isDownloading { ProgressView().controlSize(.small).tint(Color(uiColor: .systemBackground)) } else { Image(systemName: "arrow.down.circle") }
-                            Text(LaraL10n.text(en: "Use style", es: "Usar estilo"))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .eagleProminentLabel()
-                    .disabled(isDownloading)
-                } else {
-                    Text(LaraL10n.text(
-                        en: "Animated preview only · not available on the lock screen",
-                        es: "Solo vista animada · no disponible en la pantalla de bloqueo"
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                if let wallpaperID = theme.wallpaperID {
-                    NavigationLink {
-                        WallpaperGalleryView(matchingWallpaperID: wallpaperID)
-                    } label: {
-                        Label(
-                            LaraL10n.text(en: "Matching wallpaper", es: "Fondo a juego"),
-                            systemImage: "photo.on.rectangle"
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.bordered)
-                }
+        // The style itself is the card; Use and the matching wallpaper live in its sheet.
+        PasscodeStyleThumbnail(
+            theme: theme,
+            previewURL: previewURL,
+            isDownloading: isDownloading,
+            isFavorite: isFavorite,
+            isHot: isHot,
+            onLike: onToggleFavorite,
+            onOpen: onOpen
+        )
+        .contextMenu {
+            Button(action: onToggleFavorite) {
+                Label(
+                    isFavorite
+                        ? LaraL10n.text(en: "Remove like", es: "Quitar me gusta")
+                        : LaraL10n.text(en: "Like", es: "Me gusta"),
+                    systemImage: isFavorite ? "heart.slash" : "heart"
+                )
             }
-            .padding()
-        }
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.primary.opacity(0.05), lineWidth: 1)
         }
     }
-
 }
 
-private struct AnimatedPasscodePreviewView: View {
+/// A style's lock-screen capture as a complete iPhone, with its name underneath: tapped to open the
+/// style, with its like button and the HOT tag on the artwork. Shared by the gallery grid and the
+/// row of styles on the Passcode screen.
+struct PasscodeStyleThumbnail: View {
+    let theme: PasscodeGalleryTheme
+    let previewURL: URL?
+    var isDownloading = false
+    var isFavorite = false
+    var isSelected = false
+    var isHot = false
+    var onLike: (() -> Void)? = nil
+    let onOpen: () -> Void
+    @ObservedObject private var newItems = EagleNewItems.shared
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Button(action: onOpen) {
+                EagleDeviceFrame {
+                    LaraRemoteMediaPreview(
+                        url: previewURL,
+                        animated: false,
+                        contentMode: .fill,
+                        showsRetry: false
+                    )
+                    .overlay {
+                        if isDownloading {
+                            ZStack {
+                                Color.black.opacity(0.5)
+                                ProgressView().tint(.white)
+                            }
+                        }
+                    }
+                }
+            }
+            .buttonStyle(EaglePressableStyle())
+            .accessibilityLabel(theme.displayName)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundStyle(.black)
+                        .frame(width: 22, height: 22)
+                        .background(Color.white, in: Circle())
+                        .offset(x: 5, y: -5)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if isHot {
+                        EagleHotBadge()
+                            .transition(.scale(scale: 0.7).combined(with: .opacity))
+                    }
+                    if newItems.isNew(.passcode, theme.id) {
+                        EagleNewBadge()
+                    }
+                }
+                .padding(.top, 10)
+                .padding(.leading, 9)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if let onLike {
+                    EagleLikeButton(kind: .passcode, id: theme.id, isLiked: isFavorite, action: onLike)
+                        .padding(2)
+                }
+            }
+
+            Text(theme.displayName)
+                .font(.caption.weight(isSelected ? .bold : .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .eagleBackdropText()
+        }
+    }
+}
+
+/// One style, up close: its live animation (or capture) on a complete iPhone, its name with the
+/// matching wallpaper beside it, and Use at the bottom. Opened from the gallery and from the Passcode
+/// screen's row of styles.
+struct PasscodeStyleSheet: View {
     let theme: PasscodeGalleryTheme
     @ObservedObject var gallery: PasscodeGalleryManager
+    let onUse: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var mgr = laramgr.shared
     @State private var html: String?
-    @State private var errorMessage: String?
+    @AppStorage(EaglePasscodeFavorites.storageKey) private var favoritesJSON = "[]"
+
+    private var isLiked: Bool {
+        EaglePasscodeFavorites.decode(favoritesJSON).contains(theme.id)
+    }
+
+    private func toggleLike() {
+        var favorites = EaglePasscodeFavorites.decode(favoritesJSON)
+        let liked = favorites.insert(theme.id).inserted
+        if !liked {
+            favorites.remove(theme.id)
+        }
+        favoritesJSON = EaglePasscodeFavorites.encode(favorites)
+        EagleLikes.shared.setLiked(.passcode, theme.id, liked: liked)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                Group {
-                    if let html {
-                        EaglePasscodeHTMLPreview(html: html)
-                    } else if let errorMessage {
-                        VStack(spacing: 12) {
-                            Text(errorMessage)
-                                .font(.footnote)
-                                .multilineTextAlignment(.center)
-                            Button(LaraL10n.text(en: "Try again", es: "Intentar de nuevo")) {
-                                Task { await load() }
-                            }
+            ScrollView {
+                VStack(spacing: 18) {
+                    EagleDeviceFrame {
+                        if let html {
+                            EaglePasscodeHTMLPreview(html: html)
+                        } else {
+                            LaraRemoteMediaPreview(
+                                url: gallery.previewURL(for: theme),
+                                animated: false,
+                                contentMode: .fill,
+                                showsRetry: false
+                            )
                         }
-                        .padding()
-                    } else {
-                        ProgressView()
+                    }
+                    .frame(maxWidth: 240)
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(theme.displayName)
+                                .font(.title3.weight(.bold))
+                                .lineLimit(1)
+                            Text(theme.canInstall
+                                ? theme.authorLine
+                                : LaraL10n.text(en: "Preview only for now", es: "Por ahora, solo vista previa"))
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 8)
+                        EagleLikeButton(kind: .passcode, id: theme.id, isLiked: isLiked, onArtwork: false) {
+                            toggleLike()
+                        }
+                        if let wallpaperID = theme.wallpaperID {
+                            NavigationLink {
+                                WallpaperGalleryView(matchingWallpaperID: wallpaperID)
+                                    .navigationTitle(LaraL10n.text(en: "Matching wallpaper", es: "Fondo a juego"))
+                                    .navigationBarTitleDisplayMode(.inline)
+                            } label: {
+                                Image(systemName: "photo")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: Circle())
+                                    .overlay { Circle().strokeBorder(Color.primary.opacity(0.07), lineWidth: 1) }
+                            }
+                            .buttonStyle(EaglePressableStyle(kind: .swatch))
+                            .accessibilityLabel(LaraL10n.text(en: "Matching wallpaper", es: "Fondo a juego"))
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                // Prepare takes the place of Use style until the iPhone is ready.
+                if theme.canInstall {
+                    EagleApplyBar(ready: mgr.sbxready) {
+                        Button {
+                            dismiss()
+                            onUse()
+                        } label: {
+                            Text(LaraL10n.text(en: "Use style", es: "Usar estilo"))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(EagleApplyButtonStyle(busy: gallery.isDownloading(theme)))
+                        .disabled(gallery.isDownloading(theme))
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.black)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-                Text(LaraL10n.text(
-                    en: "This animation runs in Eagle only. Applying it to the iOS lock screen is still in development.",
-                    es: "Esta animación funciona solo en Eagle. Aplicarla a la pantalla de bloqueo de iOS sigue en desarrollo."
-                ))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
             }
-            .padding(16)
-            .navigationTitle(theme.name)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(LaraL10n.text(en: "Close", es: "Cerrar")) { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityLabel(LaraL10n.text(en: "Close", es: "Cerrar"))
                 }
             }
-            .task { await load() }
+            .task {
+                guard theme.hasAnimatedPreview, html == nil else { return }
+                html = try? await gallery.animatedPreviewHTML(for: theme)
+            }
         }
         .presentationDetents([.large])
-    }
-
-    private func load() async {
-        html = nil
-        errorMessage = nil
-        do {
-            html = try await gallery.animatedPreviewHTML(for: theme)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        .presentationDragIndicator(.visible)
+        // Opened: no longer news.
+        .onAppear { EagleNewItems.shared.markSeen(.passcode, theme.id) }
     }
 }
 

@@ -2336,15 +2336,7 @@ struct CompleteStylesView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 22) {
-                intro
-
-                if !mgr.sbxready {
-                    LaraAccessView(compact: true) {
-                        manager.refreshCompatibility()
-                    }
-                }
-
+            VStack(alignment: .leading, spacing: 26) {
                 if manager.hasActiveStyle,
                    let visual = manager.activeVisualPack {
                     activeStyle(
@@ -2353,154 +2345,138 @@ struct CompleteStylesView: View {
                     )
                 }
 
-                NavigationLink {
-                    LaraMatchView()
-                } label: {
-                    HStack(spacing: 15) {
-                        Image(systemName: "camera.filters")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.indigo)
-                            .frame(width: 52, height: 52)
-                            .background(Color.indigo.opacity(0.14), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Eagle Composer")
-                                .font(.headline)
-                                .foregroundStyle(.primary)
-                            Text(LaraL10n.text(
-                                en: "One image becomes your whole phone",
-                                es: "Una imagen se convierte en todo tu teléfono"
-                            ))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.tertiary)
+                // Eagle's two creative tools, side by side.
+                HStack(alignment: .top, spacing: 12) {
+                    NavigationLink {
+                        LaraMatchView()
+                    } label: {
+                        StyleToolTile(
+                            title: "Eagle Composer",
+                            subtitle: LaraL10n.text(
+                                en: "One photo styles your whole iPhone",
+                                es: "Una foto da estilo a todo tu iPhone"
+                            ),
+                            systemImage: "camera.filters"
+                        )
                     }
-                    .padding(15)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 21, style: .continuous)
-                            .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
-                    }
-                }
-                .buttonStyle(StylePressableCard())
+                    .buttonStyle(StylePressableCard())
 
-                NavigationLink {
-                    EagleResonanceView()
-                } label: {
-                    HStack(spacing: 15) {
-                        Image(systemName: "waveform.path.ecg.rectangle.fill")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.purple)
-                            .frame(width: 52, height: 52)
-                            .background(Color.purple.opacity(0.14), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 7) {
-                                Text("Eagle Resonance")
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                EagleNewBadge()
-                            }
-                            Text(LaraL10n.text(
+                    NavigationLink {
+                        EagleResonanceView()
+                    } label: {
+                        StyleToolTile(
+                            title: "Eagle Resonance",
+                            subtitle: LaraL10n.text(
                                 en: "A sound becomes your visual signature",
                                 es: "Un sonido se convierte en tu firma visual"
-                            ))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.tertiary)
+                            ),
+                            systemImage: "waveform",
+                            isNew: true
+                        )
                     }
-                    .padding(15)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 21, style: .continuous)
-                            .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
-                    }
+                    .buttonStyle(StylePressableCard())
                 }
-                .buttonStyle(StylePressableCard())
 
-                NavigationLink {
-                    CompleteStyleCreateHubView()
-                } label: {
-                    HStack(spacing: 13) {
-                        Image(systemName: "wand.and.sparkles")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.indigo)
-                            .frame(width: 44, height: 44)
-                            .background(Color.indigo.opacity(0.11), in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(LaraL10n.text(en: "Create with your own", es: "Crea con lo tuyo"))
+                        .font(.title3.weight(.bold))
+                        .eagleBackdropText()
+                        .padding(.horizontal, 4)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Crear algo propio")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                            Text("Crea fondos, números y tarjetas con tus recursos")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    VStack(spacing: 0) {
+                        NavigationLink {
+                            AnimatedWallpapersView()
+                        } label: {
+                            StyleCreateRow(
+                                title: LaraL10n.text(en: "Animated wallpaper", es: "Fondo animado"),
+                                detail: LaraL10n.text(en: "From one of your videos", es: "Desde uno de tus videos"),
+                                systemImage: "play.rectangle.fill"
+                            )
                         }
+                        .buttonStyle(EaglePressableStyle(kind: .row))
 
-                        Spacer()
+                        Divider().padding(.leading, 62)
 
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.tertiary)
+                        NavigationLink {
+                            PasscodeView(mgr: mgr)
+                        } label: {
+                            StyleCreateRow(
+                                title: LaraL10n.text(en: "Passcode digits", es: "Números del código"),
+                                detail: LaraL10n.text(en: "A style or your own images", es: "Un estilo o tus propias imágenes"),
+                                systemImage: "circle.grid.3x3.fill"
+                            )
+                        }
+                        .buttonStyle(EaglePressableStyle(kind: .row))
+
+                        Divider().padding(.leading, 62)
+
+                        NavigationLink {
+                            CardView()
+                        } label: {
+                            StyleCreateRow(
+                                title: LaraL10n.text(en: "Card", es: "Tarjeta"),
+                                detail: LaraL10n.text(en: "A design for your Wallet card", es: "Un diseño para tu tarjeta de Wallet"),
+                                systemImage: "creditcard.fill"
+                            )
+                        }
+                        .buttonStyle(EaglePressableStyle(kind: .row))
                     }
-                    .padding(16)
                     .background(Color(uiColor: .secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
                     }
-                    .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
-                .buttonStyle(StylePressableCard())
-
-                if manager.hasActiveStyle || manager.canUndo {
-                    Button {
-                        confirmRestore = true
-                    } label: {
-                        Label("Restaurar originales", systemImage: "arrow.uturn.backward.circle")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(EagleSecondaryButtonStyle())
-                    .disabled(manager.isWorking || !mgr.sbxready)
-                }
-
-                Text("La colección de combinaciones preparadas se actualizará con diseños de Eagle. Puedes seguir creando y restaurando tus cambios.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .eagleBackdropText()
             }
             .padding(.horizontal, 16)
-            .padding(.top, 10)
+            .padding(.top, 12)
             .padding(.bottom, 40)
         }
         .eagleScreenBackdrop()
-        .navigationTitle("Estilos")
+        .navigationTitle(LaraL10n.text(en: "Styles", es: "Estilos"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if manager.hasActiveStyle || manager.canUndo {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button(role: .destructive) { confirmRestore = true } label: {
+                            Label(
+                                LaraL10n.text(en: "Restore originals", es: "Restaurar originales"),
+                                systemImage: "arrow.uturn.backward"
+                            )
+                        }
+                        .disabled(!mgr.sbxready)
+                        Button { manager.clearDownloadedStyles() } label: {
+                            Label(
+                                LaraL10n.text(en: "Clear downloads", es: "Vaciar descargas"),
+                                systemImage: "trash"
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .disabled(manager.isWorking)
+                    .accessibilityLabel(LaraL10n.text(en: "More options", es: "Más opciones"))
+                }
+            }
+        }
         .onAppear { manager.refreshCompatibility() }
         .onChange(of: mgr.sbxready) { _ in manager.refreshCompatibility() }
         .confirmationDialog(
-            "¿Restaurar los originales?",
+            LaraL10n.text(en: "Restore the originals?", es: "¿Restaurar los originales?"),
             isPresented: $confirmRestore,
             titleVisibility: .visible
         ) {
-            Button("Restaurar cambios", role: .destructive) {
+            Button(LaraL10n.text(en: "Restore changes", es: "Restaurar cambios"), role: .destructive) {
                 manager.restoreOriginals()
             }
-            Button("Cancelar", role: .cancel) {}
+            Button(LaraL10n.text(en: "Cancel", es: "Cancelar"), role: .cancel) {}
         } message: {
-            Text("Eagle restaurará los respaldos del código y la tarjeta, y retirará los fondos agregados desde Estilos.")
+            Text(LaraL10n.text(
+                en: "Eagle will restore the passcode and card backups and remove the wallpapers added from Styles.",
+                es: "Eagle restaurará los respaldos del código y la tarjeta, y retirará los fondos agregados desde Estilos."
+            ))
         }
         .onChange(of: manager.lastResult?.id) { _ in
             guard let result = manager.lastResult else { return }
@@ -2517,122 +2493,114 @@ struct CompleteStylesView: View {
         }
     }
 
-    private var intro: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Crea tu propio estilo")
-                .font(.title2.bold())
-            Text("Usa una foto con Eagle Composer o edita el fondo, los números y la tarjeta por separado.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .eagleHeaderCard()
-    }
-
     private func activeStyle(_ pack: CompleteStylePack, name: String) -> some View {
         HStack(spacing: 14) {
             Image(systemName: pack.symbol)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 50, height: 50)
-                .background(
-                    LinearGradient(
-                        colors: [pack.secondary.color, pack.tertiary.color],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                )
-                .overlay {
-                    StyleLivingSheen(reduceMotion: reduceMotion, intensity: 0.20)
-                        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-                }
-                .shadow(color: pack.secondary.color.opacity(0.35), radius: 8, y: 4)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 46, height: 46)
+                .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Estilo actual")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(LaraL10n.text(en: "Current style", es: "Estilo actual"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text(name)
                     .font(.headline)
+                    .lineLimit(1)
             }
             Spacer()
             if manager.canUndo {
-                Button("Deshacer") { manager.undoLastStyle() }
+                Button(LaraL10n.text(en: "Undo", es: "Deshacer")) { manager.undoLastStyle() }
                     .font(.subheadline.weight(.semibold))
                     .disabled(manager.isWorking || !mgr.sbxready)
             }
-            Menu {
-                Button(role: .destructive) { confirmRestore = true } label: {
-                    Label("Restaurar originales", systemImage: "arrow.uturn.backward")
-                }
-                Button { manager.clearDownloadedStyles() } label: {
-                    Label("Vaciar descargas", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-            }
-            .disabled(manager.isWorking)
         }
         .padding(15)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(pack.secondary.color.opacity(0.18), lineWidth: 1)
+                .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
         }
     }
 }
 
-private struct CompleteStyleCreateHubView: View {
-    @ObservedObject private var mgr = laramgr.shared
+/// One of Eagle's creative tools as a square tile: its symbol in black or white on a flat tile, the
+/// name and one line of what it does.
+private struct StyleToolTile: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    var isNew = false
 
     var body: some View {
-        List {
-            Section {
-                NavigationLink {
-                    LaraMatchView()
-                } label: {
-                    Label(
-                        LaraL10n.text(en: "Create from a photo", es: "Crear desde una foto"),
-                        systemImage: "camera.filters"
-                    )
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Spacer()
+                if isNew {
+                    EagleNewBadge()
                 }
-                NavigationLink {
-                    AnimatedWallpapersView()
-                } label: {
-                    Label(
-                        LaraL10n.text(en: "Create a wallpaper", es: "Crear un fondo"),
-                        systemImage: "photo.on.rectangle.angled"
-                    )
-                }
-                NavigationLink {
-                    PasscodeView(mgr: mgr)
-                } label: {
-                    Label(
-                        LaraL10n.text(en: "Edit passcode digits", es: "Editar números del código"),
-                        systemImage: "circle.grid.3x3.fill"
-                    )
-                }
-                NavigationLink {
-                    CardView()
-                } label: {
-                    Label(
-                        LaraL10n.text(en: "Create a card design", es: "Crear una tarjeta"),
-                        systemImage: "creditcard.fill"
-                    )
-                }
-            } header: {
-                Text(LaraL10n.text(en: "Create with your own assets", es: "Crea con tus recursos"))
-            } footer: {
-                Text(LaraL10n.text(
-                    en: "Eagle saves originals before applying supported changes.",
-                    es: "Eagle guarda los originales antes de aplicar los cambios compatibles."
-                ))
             }
+            Spacer(minLength: 18)
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Text(subtitle)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .lineLimit(2, reservesSpace: true)
+                .multilineTextAlignment(.leading)
+                .padding(.top, 3)
         }
-        .navigationTitle(LaraL10n.text(en: "Create", es: "Crear"))
+        .padding(15)
+        .frame(maxWidth: .infinity, minHeight: 168, alignment: .topLeading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+}
+
+/// A row of the "Create with your own" list.
+private struct StyleCreateRow: View {
+    let title: String
+    let detail: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 34)
+                .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
 }
 

@@ -23,6 +23,9 @@ struct LaraCustomApp: App {
     @State private var showingStableUpdate = EagleWelcomeInstall.needsWelcome
     // Every other launch opens with the logo from the launch screen growing into the app.
     @State private var showingLaunchSplash = !EagleWelcomeInstall.needsWelcome
+    // The likes and people guide, once, inside Eagle after the welcome or the opening.
+    @State private var showingGuide = false
+    @AppStorage(EagleLikesGuide.seenKey) private var guideSeen = false
 
     private var preferredColorScheme: ColorScheme? {
         (EagleAppearanceMode(rawValue: appearanceModeRaw) ?? .dark).preferredColorScheme
@@ -32,6 +35,8 @@ struct LaraCustomApp: App {
         EaglePreferenceMigration.runIfNeeded()
         // Simplified Chinese interface text (the table lives outside the core module).
         EagleLocalization.chineseText = EagleChineseText.translate
+        EagleLocalization.russianText = EagleRussianText.translate
+        EagleLocalization.vietnameseText = EagleVietnameseText.translate
         // The screens are in place from the first frame: the opening (or the welcome) reveals them.
         EagleArrival.shared.arrive()
         EagleSpectrumStyle.configureGlobalNavigationAppearance()
@@ -73,6 +78,8 @@ struct LaraCustomApp: App {
                 }
             }
             .onAppear {
+                // The first launch does not report a change to .active, so the heartbeat starts here too.
+                EagleLikes.shared.startPresence()
                 if !isunsupported() {
                     init_offsets()
                     offsets_init()
@@ -85,6 +92,11 @@ struct LaraCustomApp: App {
                 }
             }
             .onChange(of: scenephase, perform: handleScenePhase)
+            // Once Eagle is prepared, PosterBoard's UUID is saved: wallpapers can then be added later
+            // without preparing again (Coconut's way).
+            .onChange(of: mgr.sbxready) { ready in
+                if ready { EaglePosterBoardUUID.discoverAndSave() }
+            }
             .allowsHitTesting(!showingStableUpdate && !showingLaunchSplash)
             .accessibilityHidden(showingStableUpdate || showingLaunchSplash)
             // No zoom while the welcome closes: the welcome clears onto the app's own backdrop, so only
@@ -107,6 +119,13 @@ struct LaraCustomApp: App {
                 }
             }
             .overlay {
+                if showingGuide {
+                    EagleLikesGuide { showingGuide = false }
+                        .environment(\.locale, language.locale)
+                        .zIndex(99)
+                }
+            }
+            .overlay {
                 if showingLaunchSplash {
                     EagleLaunchSplash { showingLaunchSplash = false }
                         .zIndex(101)
@@ -116,9 +135,19 @@ struct LaraCustomApp: App {
             .statusBarHidden(showingStableUpdate || showingLaunchSplash)
             .onChange(of: showingStableUpdate) { _ in EagleStatusBar.refresh() }
             .onChange(of: showingLaunchSplash) { _ in EagleStatusBar.refresh() }
+            .onChange(of: showingStableUpdate) { _ in showGuideIfNeeded() }
+            .onChange(of: showingLaunchSplash) { _ in showGuideIfNeeded() }
         }
     }
     
+    private func showGuideIfNeeded() {
+        guard !guideSeen, !showingStableUpdate, !showingLaunchSplash else { return }
+        // A moment after the app is in place, so the guide does not land on the opening.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            if !guideSeen { showingGuide = true }
+        }
+    }
+
     private func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .inactive:
@@ -128,6 +157,7 @@ struct LaraCustomApp: App {
 
         case .background:
             mgr.remoteAppDidEnterBackground()
+            EagleLikes.shared.stopPresence()
             // Preserve cleanup diagnostics without closing stdout underneath
             // a worker that is still finishing a native operation.
             globallogger.flushToDisk()
@@ -135,6 +165,7 @@ struct LaraCustomApp: App {
         case .active:
             globallogger.capture()
             mgr.remoteAppDidBecomeActive()
+            EagleLikes.shared.startPresence()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 if !showingStableUpdate {
                     EagleSceneManager.shared.applyPendingShortcutIfNeeded()

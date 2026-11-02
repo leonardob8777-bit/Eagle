@@ -15,6 +15,8 @@ let defaultPasscodeRepoURL = "https://raw.githubusercontent.com/leonardob8777-bi
 struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
     let id: String
     let name: String
+    /// The name in each interface language ("en", "es", "zh-Hans", "ru", "vi"); English, then `name`, when one is missing.
+    let names: [String: String]?
     let description: String
     let url: String?
     let preview: String
@@ -32,13 +34,47 @@ struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
         demoURL != nil && demoSha256 != nil && demoByteCount != nil
     }
 
+    var displayName: String {
+        let language = LaraL10n.language.rawValue
+        if let localized = names?[language], !localized.isEmpty { return localized }
+        if LaraL10n.language != .spanish, let english = names?["en"], !english.isEmpty { return english }
+        // The gallery's catalog mixes English and Spanish names; Eagle keeps each in every language.
+        return Self.builtInNames[id]?[language] ?? name
+    }
+
+    /// Names for the Eagle Gallery's passcodes in each interface language (en, es, zh-Hans).
+    private static let builtInNames: [String: [String: String]] = [
+        "orbit": ["en": "Orbit", "es": "Órbita", "zh-Hans": "轨道"],
+        "terminal": ["en": "Terminal", "es": "Terminal", "zh-Hans": "终端"],
+        "liquid-glass": ["en": "Liquid Glass", "es": "Cristal líquido", "zh-Hans": "液态玻璃"],
+        "brutal-paper": ["en": "Brutal Paper", "es": "Papel brutal", "zh-Hans": "粗野纸张"],
+        "synthwave": ["en": "Synthwave", "es": "Synthwave", "zh-Hans": "合成波"],
+        "pumpkin-night": ["en": "Pumpkin Night", "es": "Noche de calabazas", "zh-Hans": "南瓜之夜"],
+        "aurora": ["en": "Aurora", "es": "Aurora", "zh-Hans": "极光"],
+        "abyss": ["en": "Abyss", "es": "Abismo", "zh-Hans": "深渊"],
+        "blueprint": ["en": "Blueprint", "es": "Plano", "zh-Hans": "蓝图"],
+        "creative-enredadera": ["en": "Vine", "es": "Enredadera", "zh-Hans": "藤蔓"],
+        "creative-bordado": ["en": "Embroidery", "es": "Bordado", "zh-Hans": "刺绣"],
+        "creative-cuerda": ["en": "Rope", "es": "Cuerda", "zh-Hans": "绳索"],
+        "creative-constelacion": ["en": "Constellation", "es": "Constelación", "zh-Hans": "星座"],
+        "creative-cerillas": ["en": "Matches", "es": "Cerillas", "zh-Hans": "火柴"],
+        "creative-circuito": ["en": "Circuit", "es": "Circuito", "zh-Hans": "电路"],
+        "creative-fideos": ["en": "Noodles", "es": "Fideos", "zh-Hans": "面条"],
+        "creative-huesos": ["en": "Bones", "es": "Huesos", "zh-Hans": "骨头"],
+        "creative-vitral": ["en": "Stained Glass", "es": "Vitral", "zh-Hans": "彩绘玻璃"],
+        "creative-galaxia": ["en": "Galaxy", "es": "Galaxia", "zh-Hans": "星系"],
+        "creative-origami": ["en": "Origami", "es": "Origami", "zh-Hans": "折纸"],
+        "creative-cinta-washi": ["en": "Washi Tape", "es": "Cinta washi", "zh-Hans": "和纸胶带"],
+        "creative-plastilina": ["en": "Clay", "es": "Plastilina", "zh-Hans": "橡皮泥"],
+    ]
+
     var authorLine: String {
         if let authors, !authors.isEmpty { return authors }
         return "Eagle"
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, description, url, preview, sha256, byteCount
+        case id, name, names, description, url, preview, sha256, byteCount
         case demoURL, demoSha256, demoByteCount, wallpaperID, authors, version
     }
 
@@ -46,6 +82,7 @@ struct PasscodeGalleryTheme: Identifiable, Decodable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
+        names = try container.decodeIfPresent([String: String].self, forKey: .names)
         description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
         url = try container.decodeIfPresent(String.self, forKey: .url)
         preview = try container.decode(String.self, forKey: .preview)
@@ -150,7 +187,12 @@ final class PasscodeGalleryManager: ObservableObject {
                 guard let idx = repos.firstIndex(where: { $0.url == url }) else { continue }
                 repos[idx].isLoading = false
                 switch result {
-                case .success(let data): repos[idx].data = data
+                case .success(let data):
+                    repos[idx].data = data
+                    // Only the Eagle Gallery: a repository someone adds is not news from Eagle.
+                    if url == defaultPasscodeRepoURL {
+                        EagleNewItems.shared.observe(.passcode, ids: data.themes.map(\.id))
+                    }
                 case .failure(let error): repos[idx].error = error.localizedDescription
                 }
             }

@@ -127,6 +127,38 @@ private enum VerifyPrepareSupportMatrix {
                 expectedStatus: .unsupported,
                 expectedReason: .memoryIntegrityEnforcement
             ),
+            MatrixCase(
+                name: "A-series iPad inside the engine range is admitted",
+                version: .init(majorVersion: 18, minorVersion: 6, patchVersion: 2),
+                machine: "iPad13,1",
+                build: "22G100",
+                expectedStatus: .supported,
+                expectedReason: .ios17Through1871
+            ),
+            MatrixCase(
+                name: "M-series iPad inside the engine range is admitted",
+                version: .init(majorVersion: 26, minorVersion: 0, patchVersion: 1),
+                machine: "iPad16,3",
+                build: nil,
+                expectedStatus: .supported,
+                expectedReason: .ios260Through2601
+            ),
+            MatrixCase(
+                name: "M5 iPad is blocked before Prepare",
+                version: .init(majorVersion: 26, minorVersion: 0, patchVersion: 1),
+                machine: "iPad17,2",
+                build: nil,
+                expectedStatus: .unsupported,
+                expectedReason: .memoryIntegrityEnforcement
+            ),
+            MatrixCase(
+                name: "iPadOS 16.7.2 does not inherit the iPhone exception",
+                version: .init(majorVersion: 16, minorVersion: 7, patchVersion: 2),
+                machine: "iPad13,1",
+                build: nil,
+                expectedStatus: .possible,
+                expectedReason: .ios16Experimental
+            ),
         ]
 
         var failures = 0
@@ -202,6 +234,30 @@ private enum VerifyPrepareSupportMatrix {
                 name: "iOS 26.6 is blocked",
                 version: .init(majorVersion: 26, minorVersion: 6, patchVersion: 0),
                 machine: "iPhone17,1",
+                expectedAllowsPrepare: false
+            ),
+            PrepareGateCase(
+                name: "iPadOS 16.7.2 remains blocked",
+                version: .init(majorVersion: 16, minorVersion: 7, patchVersion: 2),
+                machine: "iPad13,1",
+                expectedAllowsPrepare: false
+            ),
+            PrepareGateCase(
+                name: "iPadOS 18.7.1 boundary remains available",
+                version: .init(majorVersion: 18, minorVersion: 7, patchVersion: 1),
+                machine: "iPad14,3",
+                expectedAllowsPrepare: true
+            ),
+            PrepareGateCase(
+                name: "iPadOS 18.7.2 boundary is blocked",
+                version: .init(majorVersion: 18, minorVersion: 7, patchVersion: 2),
+                machine: "iPad14,3",
+                expectedAllowsPrepare: false
+            ),
+            PrepareGateCase(
+                name: "M5 iPad remains blocked on an engine release",
+                version: .init(majorVersion: 18, minorVersion: 7, patchVersion: 1),
+                machine: "iPad17,1",
                 expectedAllowsPrepare: false
             ),
         ]

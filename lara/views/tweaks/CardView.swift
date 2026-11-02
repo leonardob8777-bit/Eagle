@@ -48,76 +48,72 @@ struct CardView: View {
 
     private struct cardrow: View {
         let card: carditem
+        let ending: String?
         let onreplace: (carditem, replaceoption) -> Void
         let onrestore: (carditem) -> Void
         let oneditnum: (carditem) -> Void
         let previewimg: (carditem) -> UIImage?
 
         var body: some View {
-            let preview = previewimg(card)
             VStack(alignment: .leading, spacing: 16) {
-                CardPreview(image: preview)
+                CardPreview(image: previewimg(card))
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("Tarjeta de Wallet")
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(LaraL10n.text(en: "Wallet card", es: "Tarjeta de Wallet"))
                             .font(.headline)
-                        Spacer(minLength: 8)
-                        CardBadge(text: "Wallet", systemImage: "wallet.pass")
+                        Text(ending.map { "•••• \($0)" }
+                            ?? LaraL10n.text(en: "No ending shown", es: "Sin terminación visible"))
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(.secondary)
                     }
-                    Text("Lista para personalizar")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                    .eagleBackdropText()
 
-                HStack(spacing: 10) {
-                    Menu {
-                        Button {
-                            onreplace(card, .photos)
-                        } label: {
-                            Label("Elegir de Fotos", systemImage: "photo.on.rectangle")
-                        }
-
-                        Button {
-                            onreplace(card, .files)
-                        } label: {
-                            Label("Elegir de Archivos", systemImage: "folder")
-                        }
-                    } label: {
-                        Label("Cambiar diseño", systemImage: "photo.badge.plus")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                    }
-                    .buttonStyle(CardProminentButtonStyle())
+                    Spacer(minLength: 8)
 
                     Menu {
                         Button {
                             oneditnum(card)
                         } label: {
-                            Label("Editar terminación", systemImage: "number")
+                            Label(LaraL10n.text(en: "Edit card ending", es: "Editar terminación"), systemImage: "number")
                         }
 
                         Button(role: .destructive) {
                             onrestore(card)
                         } label: {
-                            Label("Restaurar original", systemImage: "arrow.uturn.backward")
+                            Label(LaraL10n.text(en: "Restore original", es: "Restaurar original"), systemImage: "arrow.uturn.backward")
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.headline)
-                            .frame(width: 48, height: 48)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 44, height: 44)
+                            .background(Color(uiColor: .secondarySystemGroupedBackground), in: Circle())
+                            .overlay { Circle().strokeBorder(Color.primary.opacity(0.07), lineWidth: 1) }
                     }
-                    .buttonStyle(CardSecondaryButtonStyle())
-                    .accessibilityLabel("Más opciones")
+                    .accessibilityLabel(LaraL10n.text(en: "More options", es: "Más opciones"))
                 }
-            }
-            .padding(16)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
+                .padding(.horizontal, 4)
+
+                Menu {
+                    Button {
+                        onreplace(card, .photos)
+                    } label: {
+                        Label(LaraL10n.text(en: "Choose from Photos", es: "Elegir de Fotos"), systemImage: "photo.on.rectangle")
+                    }
+
+                    Button {
+                        onreplace(card, .files)
+                    } label: {
+                        Label(LaraL10n.text(en: "Choose from Files", es: "Elegir de Archivos"), systemImage: "folder")
+                    }
+                } label: {
+                    Text(LaraL10n.text(en: "Change design", es: "Cambiar diseño"))
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                }
+                .buttonStyle(CardProminentButtonStyle())
             }
         }
     }
@@ -149,8 +145,9 @@ struct CardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.07), lineWidth: 1)
+                    .strokeBorder(.white.opacity(0.10), lineWidth: 1)
             }
+            .shadow(color: .black.opacity(0.35), radius: 18, y: 10)
         }
 
         @ViewBuilder private var sheen: some View {
@@ -180,24 +177,6 @@ struct CardView: View {
                     .allowsHitTesting(false)
                 }
             }
-        }
-    }
-
-    // Badge fina y neutra para etiquetar la tarjeta.
-    private struct CardBadge: View {
-        let text: String
-        let systemImage: String
-
-        var body: some View {
-            Label(text, systemImage: systemImage)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color(uiColor: .tertiarySystemFill))
-                )
         }
     }
 
@@ -234,53 +213,45 @@ struct CardView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Tu tarjeta, con tu estilo")
-                        .font(.title2.bold())
-                    Text("Cambia la imagen que ya usa Wallet sin añadir capas, animaciones ni efectos innecesarios.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .eagleHeaderCard()
-
+            LazyVStack(alignment: .leading, spacing: 28) {
                 if !mgr.sbxready {
                     LaraAccessView(compact: true)
-                } else if working {
+                } else if working && cards.isEmpty {
                     HStack(spacing: 12) {
                         ProgressView()
-                        Text("Buscando tarjetas…")
+                        Text(LaraL10n.text(en: "Looking for cards…", es: "Buscando tarjetas…"))
                             .foregroundStyle(.secondary)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(18)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .frame(maxWidth: .infinity, minHeight: 120)
+                    .eagleHeaderCard()
                 } else if cards.isEmpty {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 10) {
                         Image(systemName: "creditcard")
-                            .font(.system(size: 34, weight: .medium))
+                            .font(.system(size: 30, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text("No encontramos tarjetas")
+                        Text(LaraL10n.text(en: "No cards found", es: "No encontramos tarjetas"))
                             .font(.headline)
-                        Text("Comprueba que tengas una tarjeta compatible en Wallet y vuelve a buscar.")
+                        Text(LaraL10n.text(
+                            en: "Add a compatible card to Wallet, then search again.",
+                            es: "Agrega una tarjeta compatible a Wallet y vuelve a buscar."
+                        ))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
-                        Button("Buscar de nuevo") {
+                        Button(LaraL10n.text(en: "Search again", es: "Buscar de nuevo")) {
                             refresh()
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(EagleSecondaryButtonStyle())
+                        .padding(.top, 6)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 30)
-                    .padding(.horizontal, 20)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .padding(.vertical, 12)
+                    .eagleHeaderCard()
                 } else {
                     ForEach(cards) { card in
                         cardrow(
                             card: card,
+                            ending: readcardnum(for: card).flatMap { $0.isEmpty ? nil : $0 },
                             onreplace: { card, option in
                                 pendingcard = card
                                 switch option {
@@ -305,24 +276,21 @@ struct CardView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Copia de seguridad automática", systemImage: "checkmark.shield")
-                        .font(.footnote.weight(.semibold))
-                    Text("Eagle conserva el archivo original antes del primer cambio para que puedas restaurarlo.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Link("Idea original de drkm9743", destination: URL(string: "https://github.com/drkm9743")!)
-                        .font(.footnote.weight(.medium))
-                        .padding(.top, 2)
+                // Credit for the original idea, kept small at the end.
+                Link(destination: URL(string: "https://github.com/drkm9743")!) {
+                    Text(LaraL10n.text(en: "Original idea by drkm9743", es: "Idea original de drkm9743"))
+                        .font(.caption.weight(.medium))
+                        .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 4)
+                .eagleBackdropText()
+                .opacity(0.6)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 32)
         }
         .eagleScreenBackdrop()
-        .navigationTitle("Tarjetas")
+        .navigationTitle(LaraL10n.text(en: "Card", es: "Tarjeta"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -336,10 +304,10 @@ struct CardView: View {
                     }
                 }
                 .disabled(working || !mgr.sbxready)
-                .accessibilityLabel("Buscar tarjetas")
+                .accessibilityLabel(LaraL10n.text(en: "Search for cards", es: "Buscar tarjetas"))
             }
         }
-        .alert("Tarjetas", isPresented: Binding(
+        .alert(LaraL10n.text(en: "Card", es: "Tarjeta"), isPresented: Binding(
             get: { status != nil },
             set: { presented in
                 if !presented {
@@ -349,34 +317,34 @@ struct CardView: View {
             }
         )) {
             if promptforrespring {
-                Button("Reiniciar interfaz") {
+                Button(LaraL10n.text(en: "Restart interface", es: "Reiniciar interfaz")) {
                     status = nil
                     promptforrespring = false
                     mgr.respring()
                 }
-                Button("Más tarde", role: .cancel) {
+                Button(LaraL10n.text(en: "Later", es: "Más tarde"), role: .cancel) {
                     status = nil
                     promptforrespring = false
                 }
             } else {
-                Button("Aceptar") { status = nil }
+                Button(LaraL10n.text(en: "OK", es: "Aceptar")) { status = nil }
             }
         } message: {
             Text(status ?? "")
         }
-        .alert("Editar terminación", isPresented: $shownumbereditor) {
-            TextField("Terminación", text: $cardnuminput)
-            Button("Guardar") {
+        .alert(LaraL10n.text(en: "Edit card ending", es: "Editar terminación"), isPresented: $shownumbereditor) {
+            TextField(LaraL10n.text(en: "Ending", es: "Terminación"), text: $cardnuminput)
+            Button(LaraL10n.text(en: "Save", es: "Guardar")) {
                 if let card = pendingnumcard {
                     applycardnum(card: card, newsuffix: cardnuminput)
                 }
             }
             if let card = pendingnumcard, haspassjsonbackup(card: card) {
-                Button("Restaurar original", role: .destructive) {
+                Button(LaraL10n.text(en: "Restore original", es: "Restaurar original"), role: .destructive) {
                     restorepassjson(card: card)
                 }
             }
-            Button("Cancelar", role: .cancel) {}
+            Button(LaraL10n.text(en: "Cancel", es: "Cancelar"), role: .cancel) {}
         } message: {
             Text(currentcardnum.isEmpty
                 ? LaraL10n.text(en: "Current ending: none", es: "Terminación actual: ninguna")

@@ -32,4 +32,4 @@ compile_and_run public
 echo "Verifying laboratory Prepare support matrix..."
 compile_and_run laboratory -D EAGLE_A18_PREPARE_LAB
 
-echo "Prepare support matrices passed (34/34)."
+echo "Prepare support matrices passed (50/50)."

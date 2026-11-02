@@ -6,7 +6,7 @@
 
   # Eagle
 
-  **Eagle is an iPhone personalization utility for compatible iOS versions.**
+  **Eagle is a personalization utility for iPhone and engine-compatible iPad devices on supported system versions.**
 
   It lets experienced sideloading users customize wallpapers, passcode keys,
   supported Wallet cards, Home Screen elements, Dynamic Island and Dock lighting
@@ -21,13 +21,13 @@
 
   <br>
 
-  <a href="https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.6/Eagle-1.0.6-95.ipa">
-    <img src="docs/badges/download.svg" alt="Download Eagle 1.0.6 IPA" height="40">
+  <a href="https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.7/Eagle-1.0.7-102.ipa">
+    <img src="docs/badges/download.svg" alt="Download Eagle 1.0.7 IPA" height="40">
   </a>
 
   <br><br>
 
-  [Release notes](https://github.com/leonardob8777-bit/Eagle/releases/tag/v1.0.6)
+  [Release notes](https://github.com/leonardob8777-bit/Eagle/releases/tag/v1.0.7)
   · [Report a bug](https://github.com/leonardob8777-bit/Eagle/issues/new?template=bug_report.md)
   · [Request a feature](https://github.com/leonardob8777-bit/Eagle/issues/new?template=feature_request.md)
 
@@ -40,8 +40,8 @@
 
 | | |
 |---|---|
-| **Current release** | Eagle 1.0.6 · build 95 |
-| **Languages** | English · Español · 简体中文 |
+| **Current release** | Eagle 1.0.7 · build 102 |
+| **Languages** | English · Español · 简体中文 · Русский · Tiếng Việt |
 | **Primarily verified on** | iPhone 16 Pro (`iPhone17,1`) · iOS 18.6.2 (`22G100`) |
 | **Architecture** | `arm64e` |
 | **Verified Aura surfaces** | Dynamic Island, Dock and current-page icon glow/outline · isolated apply and verification |
@@ -198,3 +198,17 @@ for the complete upstream record.
   <br>
   <sub>Built with Swift, SwiftUI and DarkSword.</sub>
 </div>
+
+## Eagle 1.0.7
+
+Russian and Vietnamese are available in Settings → Language and in the welcome screen.
+The update window, localized system prompts, online wallpaper and passcode names,
+likes/HOT ordering, online presence, refreshed galleries, and saved PosterBoard UUID
+workflow are included in this release. Catalog names fall back to English when a translation is missing.
+
+Prepare admits iPads on iPadOS 17.0–18.7.1 and 26.0–26.0.1, excluding M5.
+iPadOS 16 remains blocked; the 16.7.2 exception was tested only on iPhone.
+Dynamic Island requires supported iPhone hardware. iPad admission is verified in
+the compatibility tests; applying individual effects on physical iPads remains unverified.
+
+See [1.0.7 release notes](docs/releases/v1.0.7.md) for validation and the IPA.
