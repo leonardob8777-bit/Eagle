@@ -1,5 +1,10 @@
 {
-  "ipa_downloads": 2154,
-  "stars": 64,
-  "updated_at": "2026-10-22 05:34 UTC"
+  "tag": "v1.0.6",
+  "version": "1.0.6",
+  "build": "95",
+  "ipa_url": "https://github.com/leonardob8777-bit/Eagle/releases/download/v1.0.6/Eagle-1.0.6-95.ipa",
+  "downloads": 2307,
+  "stars": 65,
+  "license": "AGPL-3.0",
+  "updated": "2026-11-02T02:13+00:00"
 }
