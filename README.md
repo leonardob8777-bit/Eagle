@@ -16,7 +16,7 @@
   <a href="https://github.com/leonardob8777-bit/Eagle/releases">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/badges/stats-dark.svg">
-      <img src="docs/badges/stats-light.svg" alt="Eagle v1.0.7: 2,458 IPA downloads, 72 GitHub stars, AGPL-3.0 license" width="560">
+      <img src="docs/badges/stats-light.svg" alt="Eagle v1.0.7: 2,461 IPA downloads, 73 GitHub stars, AGPL-3.0 license" width="560">
     </picture>
   </a>
 
